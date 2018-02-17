@@ -44,6 +44,7 @@ C$DEBUG
       COMMON /ZADPO/ LNZADJ
       COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
 C     ovo je topova probna izmena
+C     ovo je ziletova probna izmena
       COMMON /PRIKAZ/ INDSC,IZPOT
       COMMON /PIJEZO/ CPOR(3,1000),NPIJEZ(20,100),NODP(100),NPIJ,NPOR,
      1                NPORCV(1000),NPOREL(1000),NEPOR,NPORE,NEPIJ
