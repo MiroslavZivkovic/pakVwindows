@@ -1,2 +1,2 @@
-# pakVwindows
-windows verzija 64bit
+# PakV64
+pakV 
