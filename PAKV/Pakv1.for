@@ -1146,15 +1146,15 @@ C     1,LVG,LGG,LKOJK
             IF(lge(MPOINT_ID(IMP)(JMP:JMP),'-').and.lle(MPOINT_ID(IMP)
      1                                          (JMP:JMP),'z')) then
                 INDMPI=INDMPI+1
-            ENDIF
+       ENDIF
         ENDDO
 !         WRITE(*,*) "INDMPI",INDMPI
 !         WRITE(*,*) "MPOINT_ID(",IMP,")",MPOINT_ID(IMP)
 !top WINDOWS START      
          if (.not.allocated(MP_RESULTS_NIZ)) allocate(MP_RESULTS_NIZ
      1                               (BRKORAKA),STAT=istat)
-          do i=1,BRKORAKA
-            MP_RESULTS_NIZ(i) = MP_RESULTS(IMP,i+1)
+      do i=1,BRKORAKA
+            MP_RESULTS_NIZ(i) = MP_RESULTS(i,IMP+1)
           enddo    
                 CALL save_series(MPOINT_ID(IMP),MP_VREME,
      1             MP_RESULTS_NIZ,BRKORAKA,MAX_MPOINTS,IMP,INDMPI,isave)
