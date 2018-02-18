@@ -45,14 +45,14 @@
         double precision :: Alpha
         double precision :: Rd_BOFANG
         double precision :: D_BOFANG
-        integer*8,dimension(2) :: IDSENSOR
-        double precision,dimension(2) :: DISTSENSOR
+        integer*8,dimension(3) :: IDSENSOR
+        double precision,dimension(3) :: DISTSENSOR
         integer*8,dimension(:,:),allocatable :: WATER
         integer*8,dimension(:,:),allocatable :: SENSOR
         double precision,dimension(:),allocatable :: HSENSOR
         double precision :: TPOC
         double precision,dimension(:),allocatable :: HFACE
-        double precision,dimension(2) :: FSENSOR
+        double precision,dimension(3) :: FSENSOR
         integer*8 :: NUMAXISPTSX
         integer*8 :: NUMAXISPTSY
         integer*8 :: NUMAXISPTSZ
@@ -62,17 +62,31 @@
         double precision,dimension(:),allocatable :: XAXISPTCORD
         double precision,dimension(:),allocatable :: YAXISPTCORD
         double precision,dimension(:),allocatable :: ZAXISPTCORD
+        integer*8 :: IFZRAC
+        integer*8 :: INFX
+        integer*8 :: INFY
+        integer*8 :: INFZ
+        integer*8,dimension(:),allocatable :: IFLUXR
+        double precision :: RKOREKCIJA
+        double precision :: PREKIDNAFR
       end module PREDISCRIBED
       
       module MESURMENTPOINTS
         integer*8 :: BRKORAKA
         integer*8 :: MAX_MPOINTS
-        character*10,dimension(:),allocatable :: MPOINT_ID
+!         character*10,dimension(:),allocatable :: MPOINT_ID
+!  promenjena duzina termometra za Grancarevo
+        character*15,dimension(:),allocatable :: MPOINT_ID
         integer*8,dimension(:),allocatable :: MP_ELEMENT
         double precision,dimension(:,:),allocatable :: MP_COORDS
         double precision,dimension(:),allocatable :: MP_VREME
         double precision,dimension(:,:),allocatable :: MP_RESULTS
         double precision,dimension(:),allocatable :: MP_RESULTS_NIZ
+        integer*8 :: MAX_DPOINTS
+        character*10,dimension(:),allocatable :: DPOINT_ID
+        integer*8,dimension(:),allocatable :: DP_ELEMENT
+        double precision,dimension(:,:),allocatable :: DP_COORDS
+        double precision,dimension(:,:,:),allocatable :: DP_RESULTS
       end module MESURMENTPOINTS
       
       module RESULTS
@@ -94,8 +108,14 @@
         double precision,dimension(:,:),allocatable :: POMER
         integer*8,dimension(:),allocatable :: IVECT
         double precision,dimension(:),allocatable :: SILE
-    end module RESULTS
-    
-    module KONTURE
+      end module RESULTS
+      
+      module KONTURE
         integer*8,dimension(:),allocatable :: LIN
       end module KONTURE
+ 
+      module pflux
+        double precision,dimension(:),allocatable :: PFLUXEL
+        double precision,dimension(:),allocatable :: FCONEL
+        double precision,dimension(:),allocatable :: TOKOLINEL
+      end module pflux

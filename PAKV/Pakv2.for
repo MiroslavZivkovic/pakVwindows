@@ -92,11 +92,11 @@ C==========================================================================
       SUBROUTINE OTVORI
 CS OTVARANJE DATOTEKA
 CE OPEN FILES
-C      COMMON /IME/ IME
+      COMMON /IME/ IME
       COMMON /SRPSKI/ ISRPS
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /CERNE/ IGRESK,IPROTK,IZSILE
-      CHARACTER*1 IME*20
+      CHARACTER*50 IME
 C      LOGICAL OLDNEW
       COMMON /CDEBUG/ IDEBUG
       IF(IDEBUG.GT.0) PRINT *, ' OTVORI'
@@ -884,7 +884,6 @@ C
       COMMON /PENALL/ PENALT,PRESS,IBRGT
       COMMON /AXIS/ HH,RIZ,INDAX
       COMMON /ELECTR/ INDJOT,INDFS
-      COMMON /CDEBUG/ IDEBUG
       DIMENSION P(NDIM,4),XJ(3,3),IPERM(8),PJ(3,NDIM)
       DATA IPERM/2,3,4,1,6,7,8,5/
 C
@@ -1098,7 +1097,6 @@ C ......................................................................
 C
       COMMON /TRENT3/ ZVHX(21),ZVHY(21),ZVHZ(21),CK(3,21),H(21),
      1 FS2,DETJS,DETJ,NBREL
-      COMMON /CDEBUG/ IDEBUG
       DIMENSION XJJ(2,2)
 C
       IF(IDEBUG.GT.0) PRINT *, ' MINV2 '
@@ -1992,7 +1990,7 @@ C==========================================================================
       ENDIF
    10 CONTINUE
       IF(INDSC.EQ.2) RETURN
-      Write(*,*) "indsc ulazt1", INDSC
+!       Write(*,*) "indsc ulazt1", INDSC
  1007 FORMAT(I5,3X,I2,3F10.5,I5)
  1017 FORMAT(I10,3X,I2,3F10.5,I5)
 C 1008 FORMAT(I5,3X,I2,3E12.5,I5)
@@ -2799,3 +2797,23 @@ C
 
       END
 C======================================================================
+C=======================================================================
+
+      SUBROUTINE JEDV(A,B,C)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      COMMON /CDEBUG/ IDEBUG
+C
+      IF(IDEBUG.GT.0) PRINT *, ' JEDV  '
+C
+CS  IZRACUNAVANJE JEDINICNOG VEKTORA
+C        D^2 = A^2 + B^2 + C^2
+C        A=A/D, B=B/D, C=C/D
+C
+      D=DSQRT(A*A+B*B+C*C)
+      A=A/D
+      B=B/D
+      C=C/D
+      RETURN
+      END
+C=======================================================================
+

@@ -11,6 +11,7 @@ C$DEBUG
       include 'paka.inc'
       INCLUDE 'mpif.h'
 !      PARAMETER (NTOT = 200000000)
+      COMMON /IME/ IME
       COMMON /SRPSKI/ ISRPS
       COMMON /DUZINA/ LMAX,MTOT,LMAXM,LRAD,NRAD
       COMMON /CDEBUG/ IDEBUG
@@ -43,9 +44,7 @@ C$DEBUG
       COMMON /FLUX/ KISA
       COMMON /ZADPO/ LNZADJ
       COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
-C     ovo je topova probna izmena
-C     ovo je ziletova probna izmena
-C     ovo je ziletova druga izmena
+C
       COMMON /PRIKAZ/ INDSC,IZPOT
       COMMON /PIJEZO/ CPOR(3,1000),NPIJEZ(20,100),NODP(100),NPIJ,NPOR,
      1                NPORCV(1000),NPOREL(1000),NEPOR,NPORE,NEPIJ
@@ -59,6 +58,7 @@ C    DEFINISANJE MAKSIMALNE RADNE MEMORIJE U VEKTORU A
 C
 !      COMMON A(NTOT)
 !      REAL A
+
       DIMENSION IA(1)
       EQUIVALENCE(A(1),IA(1))
 C
@@ -68,6 +68,10 @@ C
       CHARACTER*80 NASLOV
       CHARACTER*80 KRAJ
       CHARACTER*250 ACOZ
+      CHARACTER*50 IME
+      CHARACTER*54 IMECSV
+      CHARACTER*4  CSVEXT
+      
 C
       CHARACTER*5 PRTOK(10)
       
@@ -78,7 +82,7 @@ C      DIMENSION IBFK(5,3),FAKP(5,3),TOPM(5),TMNM(5)
       DATA PRTOK /'FLUX1','FLUX2','FLUX3','FLUX4','FLUX5','FLUX6',
      *            'FLUX7','FLUX8','FLUX9','FLU10'/
       integer ierr, myid
-      integer*8 LM2
+      integer*8 LM2,INDWATER
       integer Dtime(8)
 
       CALL MPI_INIT(ierr)
@@ -86,8 +90,8 @@ C      DIMENSION IBFK(5,3),FAKP(5,3),TOPM(5),TMNM(5)
 
       IF (myid.ne.0) goto 1234
       
-      MTOT=NTOT
-      MAXVEC=NTOT
+       MTOT=NTOT
+       MAXVEC=NTOT
 C
 C IDVA - INDIKATOR ZA NUMERICKU TACNOST
 C IDVA=1 JEDNOSTRUKA TACNOST
@@ -134,10 +138,11 @@ C==========================================================================
        READ(ACOZ,1002) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,IANIZ,NULAZ
       ENDIF
       if(NSTAC.EQ.2) THEN
-        isave=0
+        isave=1
       ELSE
         isave=1
       ENDIF
+!       write(*,*)"NSTAC,isave",NSTAC,isave
  1002 FORMAT(16I5)
  1022 FORMAT(i10,15I5)
       IF(NPER.EQ.0) NPER = 1
@@ -582,7 +587,7 @@ C     111X,'POCETNI PRITISAK .............................P= ',F10.3//
      111X,'INDIKATOR ZA SILE IZNAD FS (0-DA, 1-NE) ...ISIL= ',I5//
      111X,'IND. ZA FILTR. SILE(0-UKUPNE,1-FIL,2-POT) .IFIL= ',I5//  
      111X,'KOEFICIJENT ZASICENOSTI ................. ZASIC= ',1PE13.5//
-     111X,'INDIKATOR PRIMENE KOEFICIJENTA POROZNOSTI .IPOR= ',I5)
+     111X,'KOEFICIJENT POROZNOSTI ................... IPOR= ',I5)
  6008 FORMAT(////
 C     111X,'INITIAL VELOCITY IN X DIRECTION ..............U= ',F10.3//
 C     111X,'INITIAL VELOCITY IN Y DIRECTION ..............V= ',F10.3//
@@ -592,7 +597,7 @@ C     111X,'INITIAL PRESSURE .............................P= ',F10.3//
      111X,'IND. FOR FORCES ABOVE FS (0-YES, 1-NO) ....ISIL= ',I5//
      111X,'IND.FOR FILTR.FORCES(0-TOTAL,1-FIL,2-POT) .IFIL= ',I5//  
      111X,'KOEFFICIENT OF SATURATION ............... ZASIC= ',1PE13.5//
-     111X,'INDICATOR FOR COEFFICIENT OF POROSITY .... IPOR= ',I5)
+     111X,'KOEFFICIENT OF POROSITY................... IPOR= ',I5)
 C        
 C==========================================================================
 C
@@ -606,17 +611,17 @@ C
      * WRITE(IIZLAZ,6009) MAXSIL,INDFS,KISA
       ELSEIF(IPAKT.EQ.1) THEN
 C ucitavanje broja elemenata na kojima je zadat fluks, prelazanost i zracenje      
-        IF(INPT.eq.0) READ(ACOZ,1015) MAXSIL,MAXTQE,MAXER,INDWATER
-        IF(INPT.eq.1) READ(ACOZ,1016) MAXSIL,MAXTQE,MAXER,INDWATER
+      IF(INPT.eq.0) READ(ACOZ,1015) MAXSIL,MAXTQE,MAXER,INDWATER,IFZRAC
+      IF(INPT.eq.1) READ(ACOZ,1016) MAXSIL,MAXTQE,MAXER,INDWATER,IFZRAC
         IF(ISRPS.EQ.0)
-     *    WRITE(IIZLAZ,3088) POCT,INDPT,MAXSIL,MAXTQE,MAXER,INDWATER
+     * WRITE(IIZLAZ,3088) POCT,INDPT,MAXSIL,MAXTQE,MAXER,INDWATER,IFZRAC
         IF(ISRPS.EQ.1)
-     *    WRITE(IIZLAZ,6088) POCT,INDPT,MAXSIL,MAXTQE,MAXER,INDWATER
+     * WRITE(IIZLAZ,6088) POCT,INDPT,MAXSIL,MAXTQE,MAXER,INDWATER,IFZRAC
        ENDIF
  1222 FORMAT(I10,2I5)
  1223 FORMAT(3I5)
- 1015 FORMAT(4I5)
- 1016 FORMAT(4I10)
+ 1015 FORMAT(5I5)
+ 1016 FORMAT(5I10)
  2009 FORMAT(//,
      111X,'PODACI O GRANICNIM USLOVIMA '//
      111X,'UKUPAN BROJ POVRSINA SA ZADATIM FLUKSOM ...... MAXSIL =',I10/
@@ -642,7 +647,8 @@ C ucitavanje broja elemenata na kojima je zadat fluks, prelazanost i zracenje
      411X,'UKUPAN BROJ POVRSINA SA ZADATIM FLUKSOM ...... MAXSIL =',I5/
      511X,'UKUPAN BROJ POVRSINA SA ZADATIM PRELAZOM ..... MAXTQE =',I5/
      111X,'UKUPAN BROJ POVRSINA SA ZADATIM ZRACENJA ...... MAXER= ',I5/
-     111X,'INDIKATOR ZA VODEE STRUKTURE(BRANE,...)..... INDWATER= ',I5)
+     111X,'INDIKATOR ZA VODEE STRUKTURE(BRANE,...)..... INDWATER= ',I5/
+     111X,'INDIKATOR ZA ZRACENJE/FLUKS  ..................IFZRAC= ',I5)
  6088 FORMAT(////
      111X,'INITIAL TEMPERATRUE ......................... POCT= ',F10.3/
      111X,'INDIKATOR POCETNE TEMPERATURE ................  INDPT =',I5/
@@ -652,7 +658,8 @@ C ucitavanje broja elemenata na kojima je zadat fluks, prelazanost i zracenje
      111X,'TOTAL NUMBER OF SURFACES WITH PRESCRIBED FLUX .MAXTHP= ',I5/
      111X,'TOTAL NUMBER OF SURFACES WITH PRESCRIBED CONV .MAXTQE= ',I5/
      111X,'TOTAL NUMBER OF SURFACES WITH PRESCRIBED RAD . MAXER= ',I5/
-     111X,'INDICATOR FOR WATER STRUCTURES (DAMS,  ...) .INDWATER= ',I5)
+     111X,'INDICATOR FOR WATER STRUCTURES (DAMS,  ...) .INDWATER= ',I5/
+     111X,'INDICATOR FOR RADIATION/FLUX  .................IFZRAC= ',I5)
 C
       LNGPSI=LMAX
 !       IF (NETIP.EQ.2) LMAX=LNGPSI+4*MAXSIL
@@ -664,6 +671,9 @@ C
       CALL PROMEM(LMAX)
 !       IF (NETIP.EQ.2)
 !      1CALL ULAZT4(A(LPOVSI),NEL,A(LNGPSI),MAXSIL,NDIM)
+      IF(MAXSIL.GT.0) THEN
+       if (.not.allocated(IFLUXR)) allocate(IFLUXR(MAXSIL),STAT=istat) 
+      ENDIF
       CALL ULA3D4(A(LPOVSI),NEL,A(LNGPSI),MAXSIL,NDIM)
       IF(IPAKT.EQ.1) THEN
 C ucitavanje elemenata na kojima je zadata prelaznost
@@ -683,7 +693,7 @@ C ucitavanje elemenata na kojima je zadata radijacija
           IF(NWATERS.GT.0) THEN
             if(.not.allocated(WATER)) allocate(WATER(3,NWATERS),
      1        STAT=istat)
-            CALL ULA3D4VODE()
+            CALL ULA3D4VODE() 
           ENDIF
           IF(NSENSORS.GT.0) THEN
             if(.not.allocated(SENSOR)) allocate(SENSOR(3,NSENSORS),
@@ -696,6 +706,23 @@ C ucitavanje elemenata na kojima je zadata radijacija
             CALL ISPITA(ACOZ)
             READ(ACOZ,1988) Rd_BOFANG,D_BOFANG,Alpha
           ENDIF
+       WRITE(IIZLAZ,6089) Rd_BOFANG,D_BOFANG,Alpha
+ 6089 FORMAT(////
+     111X,'Bofang parameter..................... Rd_BOFANG= ',F10.3/
+     111X,'Bofang parameter...................... D_BOFANG= ',F10.3/
+     116X,'Bofang parameter......................... Alpha= ',F10.3/)
+        ENDIF
+C ucitavanje funkcija kojima je definisan vektor normale izvora zracenja
+        IF(IFZRAC.EQ.1) THEN
+          CALL ISPITA(ACOZ)
+          READ(ACOZ,1123) INFX,INFY,INFZ,RKOREKCIJA,PREKIDNAFR
+       WRITE(IIZLAZ,6090) INFX,INFY,INFZ,RKOREKCIJA,PREKIDNAFR
+ 6090 FORMAT(////
+     111X,'Function for normal Vn ....................... INFX= ',I10/
+     111X,'Function for normal Ve ....................... INFY= ',I10/
+     111X,'Function for normal Vz ....................... INFZ= ',I10/
+     111X,'Koef. korekcije merengo zracenja ..............rc= ',F10.3/
+     111X,'Prekidna funkciaj vode  ..................... Zg= ',F10.3/)
         ENDIF
       ENDIF
 C
@@ -721,6 +748,7 @@ CN       ENDIF
      * WRITE(IIZLAZ,6217) NKONT
 C
  1122  FORMAT(I5,I10)
+ 1123  FORMAT(3I10,2F10.4)
  1987  FORMAT(3I10)
  1988  FORMAT(3F10.4)
  3003  FORMAT(I5,'   LIN   ')
@@ -905,8 +933,13 @@ C
       NEPOR=1
       IPIJEZ=46
       IF(INDSC.EQ.1.OR.INDSC.EQ.3) THEN
+        IF(IPAKT.EQ.0)THEN
         OPEN (IPIJEZ,FILE='PIJEZ.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
+        ELSEIF(IPAKT.EQ.1)THEN
+       OPEN (IPIJEZ,FILE='PIJEZT.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
+     1      ACCESS='SEQUENTIAL')
+        ENDIF
 
           READ(IPIJEZ,1002,err=9999) NPIJ,MAXNP
           if (npij.gt.0) then
@@ -958,10 +991,15 @@ C
           NEPOR=0
         ENDIF
         IF(INDSC.EQ.2.OR.INDSC.EQ.4) THEN
+        IF(IPAKT.EQ.0)THEN
         OPEN (IPIJEZ,FILE='PIJEZ.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
+        ELSEIF(IPAKT.EQ.1)THEN
+       OPEN (IPIJEZ,FILE='PIJEZT.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
+     1      ACCESS='SEQUENTIAL')
+        ENDIF
      
-        READ(IPIJEZ,356) MAX_MPOINTS
+        READ(IPIJEZ,356) MAX_MPOINTS,MAX_DPOINTS
           if (MAX_MPOINTS.gt.0) then
              if (.not.allocated(MPOINT_ID)) allocate(MPOINT_ID
      1                                  (MAX_MPOINTS),STAT=istat)
@@ -974,20 +1012,45 @@ C
              if (.not.allocated(MP_RESULTS)) allocate(MP_RESULTS
      1                             (BRKORAKA,MAX_MPOINTS+1),STAT=istat)
              DO I=1,MAX_MPOINTS
-                READ(IPIJEZ,357) MPOINT_ID(I),MP_ELEMENT(I),
+                 READ(IPIJEZ,358) MPOINT_ID(I),MP_ELEMENT(I),
+!   promenjen format za Grancarevo za nazive termometra na A15
+!                 READ(IPIJEZ,358) MPOINT_ID(I),MP_ELEMENT(I),
      1                              (MP_COORDS(jj,I),jj=1,6)
              ENDDO
           endif
-     
+C dodato citanje tacaka u kojima se stampaju vrednosti za prikaz rezultata
+          if (MAX_DPOINTS.gt.0) then
+             if (.not.allocated(DPOINT_ID)) allocate(DPOINT_ID
+     1                                  (MAX_DPOINTS),STAT=istat)
+             if (.not.allocated(DP_ELEMENT)) allocate(DP_ELEMENT
+     1                                  (MAX_DPOINTS),STAT=istat)
+             if (.not.allocated(DP_COORDS)) allocate(DP_COORDS
+     1                               (6,MAX_DPOINTS),STAT=istat)
+!              if (.not.allocated(DP_VREME)) allocate(MP_VREME
+!      1                               (MAX_DPOINTS),STAT=istat)
+             if (.not.allocated(DP_RESULTS)) allocate(DP_RESULTS
+     1                         (BRKORAKA,2,MAX_DPOINTS+1),STAT=istat)
+             DO I=1,MAX_DPOINTS
+                READ(IPIJEZ,357) DPOINT_ID(I),DP_ELEMENT(I),
+     1                             (DP_COORDS(jj,I),jj=1,6)
+             ENDDO
+          IZPOD=50
+          CSVEXT='.CSV'
+          IMECSV=trim(IME) // CSVEXT
+          OPEN (IZPOD,FILE=IMECSV,STATUS='UNKNOWN',
+     1      FORM='FORMATTED',ACCESS='SEQUENTIAL')
+          endif
         ENDIF
         
 C KRAJ DELA ZA UCITAVANJE PODATAKA IZ PIJEZO.DAT
 C
  9998 IZNEU=49
-      IZPRO=48
-      IZPOT=47
+!       IF(IPAKT.EQ.0) THEN
+       IZPRO=48
       OPEN (IZPRO,FILE='PROT.NEU',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
+!       ENDIF
+       IZPOT=47
       OPEN (IZPOT,FILE='POT.TXT',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
 CN       IF (INDSC.EQ.0) THEN
@@ -1004,7 +1067,9 @@ C      IF (NETIP.EQ.3) CALL TGRAU3(NEL,NDIM,NET,IZNEU)
      *CALL TGRAU3K(A(LKONT),NDIM,IZPRO)
 C
 CN      IF (INDSC.EQ.0)THEN
-        CALL NEUTRA(A(LVREME),NPER,NASLOV,1,48)
+!       IF(IPAKT.EQ.0) THEN
+       CALL NEUTRA(A(LVREME),NPER,NASLOV,1,48)
+!       ENDIF
         CALL NEUTRA(A(LVREME),NPER,NASLOV,1,49)
         IF(NKONT.GT.0) CALL TGRMATK(A(LKONT),NEL,A(LKONST),NDIM)
         CALL TGRMATS(NEL,A(LKONST),NDIM,NET)
@@ -1017,8 +1082,9 @@ C
      *WRITE(IIZLAZ,6020)
  1333 FORMAT(I5,3F10.5)
 13330 FORMAT(I10,3F10.5)
-  356 FORMAT(I10)
+  356 FORMAT(2I10)
   357 FORMAT(A10,I10,6F10.2)
+  358 FORMAT(A15,I10,6F10.2)
  2020 FORMAT(///' ZAVRSENO JE UCITAVANJE I GENERISANJE ULAZNIH PODATAKA'
      1/' ULAZNI PODACI SU BEZ FORMALNIH GRESAKA'/
      2' ZA IZVRSENJE PROGRAMA UNETI:   IREST = 0'//)
@@ -1073,9 +1139,10 @@ C     1,LVG,LGG,LKOJK
      1A(LPOVSI),POMER,A(LITFMA),A(LKONST),NASLOV,
      1A(LICUR),VG,GG,INDPT)
       ENDIF
+!          WRITE(*,*) "isave",isave
       DO IMP=1,MAX_MPOINTS
         INDMPI=0
-        DO JMP=1,10
+        DO JMP=1,15
             IF(lge(MPOINT_ID(IMP)(JMP:JMP),'-').and.lle(MPOINT_ID(IMP)
      1                                          (JMP:JMP),'z')) then
                 INDMPI=INDMPI+1
@@ -1083,7 +1150,6 @@ C     1,LVG,LGG,LKOJK
         ENDDO
 !         WRITE(*,*) "INDMPI",INDMPI
 !         WRITE(*,*) "MPOINT_ID(",IMP,")",MPOINT_ID(IMP)
-        
 !top WINDOWS START      
          if (.not.allocated(MP_RESULTS_NIZ)) allocate(MP_RESULTS_NIZ
      1                               (BRKORAKA),STAT=istat)
@@ -1113,6 +1179,8 @@ C     ZAPISIVANJE TEMPERATURA KOJE CE BITI POCETNE
          CALL POCETNET(TT1,NPT,99,0)
             CLOSE (99)
       ENDIF
+      CALL DATE_AND_TIME(VALUES=Dtime)
+      WRITE(*,*) 'vreme na kraju', (Dtime(i),i=5,7)
 C==========================================================================
       IF(ISRPS.EQ.0)
      *WRITE(IIZLAZ,2500)

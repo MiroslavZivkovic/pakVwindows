@@ -994,9 +994,51 @@ c       write(iizlaz,*)'fk1=',fk1
 c       do ii=1,2
 c        write(iizlaz,*)TABF(1,1,Ii),TABF(2,1,Ii)
 c       enddo
-       CALL TIMFUN (TABF,FK1,VVREME,ITFMAX(NZAD(3,I)),NZAD(3,I))
-
+        CALL TIMFUN (TABF,FK1,VVREME,ITFMAX(NZAD(3,I)),NZAD(3,I))
        IF(NZAD(2,I).EQ.6.AND.CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+!  za Grancarevo zavisnost na granicama modela
+!  desna obala
+       IF(NZAD(2,I).EQ.7) Then
+        FK1=301.0+0.332*FK1
+        if(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+       ENDIF
+       IF(NZAD(2,I).EQ.-1) Then
+        SELECT CASE (NZAD(3,I))
+        CASE (1)
+           INTERPAXIS=1
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
+     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+        CASE (2)
+           INTERPAXIS=2
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
+     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+        CASE (3)
+           INTERPAXIS=3
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
+     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+        CASE DEFAULT
+        END SELECT
+        IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+       ENDIF
+!  leva obala - linearno
+       IF(NZAD(2,I).EQ.0) Then
+        SELECT CASE (NZAD(3,I))
+        CASE (1)
+           INTERPAXIS=1
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
+     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,2)
+        CASE (2)
+           INTERPAXIS=2
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
+     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,2)
+        CASE (3)
+           INTERPAXIS=3
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
+     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,2)
+        CASE DEFAULT
+        END SELECT
+        IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+       ENDIF
 c       write(iizlaz,*)'fk1=',fk1, vvreme,ITFMAX(NZAD(3,I)),NZAD(3,I)
 c       do ii=1,2
 c        write(iizlaz,*)TABF(1,1,Ii),TABF(2,1,Ii)
@@ -1550,10 +1592,13 @@ C stampanje rezultata u svim cvorovima
         CALL STAU09c(TT1,CORD,ID,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
      1               NEL)
       ENDIF
+c STAMPANJE REZULTATA ZA DODATNE TACKE - CRTANJE      
       IF(INDSC.EQ.2.OR.INDSC.EQ.4) THEN
-        CALL STAU09CT(TT1,CORD,47,VVREME,KKORAK,NEL)
-        CALL STAU09CTV(VECTJ,CORD,47,VVREME,KKORAK,NEL)
-        CALL STAU09CTPP(PORNIEL,CORD,47,VVREME,KKORAK,NEL)
+!         CALL STAU09CT(TT1,CORD,47,VVREME,KKORAK,NEL)
+         CALL STAU09CDPV(TT1,VECTJ,CORD,50,VVREME,KKORAK,NEL)
+!          CALL STAU09CDP(TT1,CORD,50,VVREME,KKORAK,NEL)
+!          CALL STAU09CDV(VECTJ,CORD,50,VVREME,KKORAK,NEL)
+!         CALL STAU09CTPP(PORNIEL,CORD,47,VVREME,KKORAK,NEL)
       ENDIF
       ENDIF
 ! 
@@ -2823,7 +2868,7 @@ C ......................................................................
       INTEGER IDEBUG
 
       INTEGER NZADJ,NZADP,NZAD,IOSA,ITFMAX,NTABFT
-      INTEGER I,J,K, NJ, NDIJ, istat
+      INTEGER I,J,K, NJ, NDIJ, istat,INTERPAXIS
       DOUBLE PRECISION A,CORD,FK1,ZASIC,TABF,VVREME
 
       DIMENSION NZADJ(*),NZAD(3,*),CORD(3,*)
@@ -2838,15 +2883,13 @@ C ......................................................................
       
       if (.not.allocated(NZADC)) then 
         allocate(NZADC(NZADP),STAT=istat)
-        CALL ICLEAR8(NZADC,NZADP)      
+        CALL ICLEAR8(NZADC,NZADP)       
         DO J = 1, nonzeros
           IF(rows(J).EQ.columns(J)) THEN
             DO I=1,NZADP
               IF (NZAD(2,I).EQ.4.OR.NZAD(2,I).EQ.5) EXIT
-
               NJ=NZADJ(I)
               IF(NJ.eq.rows(J)) THEN
-              IF(I.EQ.8107) WRITE(3,*) 'I, NJ, J', I,NJ,J
                 NZADC(I)=J
                 EXIT
               ENDIF
@@ -2856,13 +2899,56 @@ C ......................................................................
       endif
 
        DO 10 I=1,NZADP
-          IF(IPAKT.NE.1) THEN
-           CALL TIMFUN (TABF,FK1,VVREME,ITFMAX(NZAD(3,I)),NZAD(3,I))
-           IF(NZAD(2,I).EQ.6.AND.CORD(IOSA,NZAD(1,I)).GT.FK1) goto 10
+         IF(IPAKT.NE.1) THEN
+          CALL TIMFUN (TABF,FK1,VVREME,ITFMAX(NZAD(3,I)),NZAD(3,I))
+          IF(NZAD(2,I).EQ.6.AND.CORD(IOSA,NZAD(1,I)).GT.FK1) goto 10
+!  za Grancarevo zavisnost na granicama modela
+!  desna obala
+          IF(NZAD(2,I).EQ.7) Then
+           FK1=301.0+0.332*FK1
+           if(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 10
           ENDIF
-          IF (NZAD(2,I).EQ.4.OR.NZAD(2,I).EQ.5) GOTO 10
+          IF(NZAD(2,I).EQ.-1) Then
+           SELECT CASE (NZAD(3,I))
+           CASE (1)
+            INTERPAXIS=1
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
+     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+           CASE (2)
+            INTERPAXIS=2
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
+     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+           CASE (3)
+            INTERPAXIS=3
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
+     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+           CASE DEFAULT
+           END SELECT
+           IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 10
+          ENDIF
+!  leva obala - linearno
+          IF(NZAD(2,I).EQ.0) Then
+           SELECT CASE (NZAD(3,I))
+           CASE (1)
+            INTERPAXIS=1
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
+     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,2)
+           CASE (2)
+            INTERPAXIS=2
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
+     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,2)
+           CASE (3)
+            INTERPAXIS=3
+          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
+     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,2)
+           CASE DEFAULT
+           END SELECT
+           IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 10
+          ENDIF
+         ENDIF
+         IF (NZAD(2,I).EQ.4.OR.NZAD(2,I).EQ.5) GOTO 10
          
-          IF(NZADC(I).GT.0) stiff(NZADC(I)) = PENALTY_FACTOR
+         IF(NZADC(I).GT.0) stiff(NZADC(I)) = PENALTY_FACTOR
 
    10  CONTINUE
    
@@ -2881,6 +2967,8 @@ C=========================================================================
       USE ELEMENTS
       USE PREDISCRIBED
       USE KONTURE
+      USE pflux
+
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 
       include 'paka.inc'
@@ -2959,6 +3047,7 @@ C
       DIMENSION AJX1(20),AJY1(20),AJZ1(20),NRED(8),NREDK(8)
       DIMENSION NRED1(2),NREDT4(4),NREDT10(10),NRED26(6),NRED28(8)
       DIMENSION HT(9,3),CKL(3,8),TTE(2,3),WTET(3),INDEKS(10)
+      DIMENSION A12(3),A13(3),DN(3)
 !       promenjena duzina NRED sa 8 na 10 i dodata 2 clana
       DATA NRED/8,4,2,6,7,3,1,5/  
       DATA NREDK/27,9,3,21,25,7,1,19/
@@ -2973,6 +3062,7 @@ C
       CHARACTER*3 STATTT
       DIMENSION NDJEL(21),NP3D1(5)
       logical OLDNEWW
+      integer Dtime(8)
 
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
 
@@ -2980,6 +3070,14 @@ C
   
       if (.not.allocated(PORNIEL)) allocate(PORNIEL(NET,10),STAT=istat) 
       if(.not.allocated(IDJSTAMP1))allocate(IDJSTAMP1(5,NPT),STAT=istat) 
+      IF(MAXSIL.GT.0) THEN
+       if(.not.allocated(PFLUXEL))allocate(PFLUXEL(MAXSIL),STAT=istat) 
+      ENDIF
+      IF(MAXTQE.GT.0) THEN
+       if(.not.allocated(FCONEL))allocate(FCONEL(MAXTQE),STAT=istat) 
+       if(.not.allocated(TOKOLINEL))allocate(TOKOLINEL(MAXTQE),
+     1       STAT=istat) 
+      ENDIF
       DO I=1,5
         DO JJ=1,NPT
           IDJSTAMP1(I,JJ)=0
@@ -3185,75 +3283,6 @@ C===========================================================================
 
 C
       IF((KKORAK.EQ.1).AND.(ITER.EQ.0))THEN
-C petlja po pornim celijama
-!       do II=1,NPORE
-! C odredjivanje lokalnih koordinata porne celije - termometra
-!       deltta=0.1
-!       RP=-1.02
-!       SP=-1.02
-!       TP=-1.02
-!       DMIN=100.0
-!       RMIN(II)=100.0
-!       SMIN(II)=100.0
-!       TMIN(II)=100.0
-!       DRST=0.02
-!       DO  IR=1,100
-!         RP=RP+DRST
-!         SP=-1.02
-!       DO  JS=1,100
-!         SP=SP+DRST
-!         TP=-1.02
-!       DO  LT=1,100
-!         TP=TP+DRST
-! c        CALL INTERST(RP,SP,TP)
-!           RPP=1.0+RP
-!           SPP=1.0+SP
-!           TPP=1.0+TP
-!           RM=1.0-RP
-!           TM=1.0-TP
-!           SM=1.0-SP
-!           RR=1.0-RP*RP
-!           SS=1.0-SP*SP
-!           TT=1.0-TP*TP
-!           DO I=1,8
-!             H(I)=0.
-!           ENDDO
-!           H(1)=0.125*RPP*SPP*TPP
-!           H(2)=0.125*RM*SPP*TPP
-!           H(3)=0.125*RM*SM*TPP
-!           H(4)=0.125*RPP*SM*TPP
-!           H(5)=0.125*RPP*SPP*TM
-!           H(6)=0.125*RM*SPP*TM
-!           H(7)=0.125*RM*SM*TM
-!           H(8)=0.125*RPP*SM*TM
-!         XT=0.
-!         YT=0.
-!         ZT=0.
-!         DO JJ=1,8
-!           XT=XT + H(JJ)*CORD(1,NEL(JJ,NPOREL(II)))
-!           YT=YT + H(JJ)*CORD(2,NEL(JJ,NPOREL(II)))
-!           ZT=ZT + H(JJ)*CORD(3,NEL(JJ,NPOREL(II)))
-!         enddo
-!         DX=XT-CPOR(1,II)
-!         DY=YT-CPOR(2,II)
-!         DZ=ZT-CPOR(3,II)
-!         dxyz=DX*DX+DY*DY+DZ*DZ
-!         DXYZ=SQRT(dxyz)
-!         IF (DXYZ.LE.DMIN) THEN
-!             DMIN=DXYZ
-!             RMIN(II)=RP
-!             SMIN(II)=SP
-!             TMIN(II)=TP
-!          ENDIF
-!       enddo
-!       enddo
-!       enddo
-! C  kraj petlje po pornim celijama
-!          iel=NPOREL(II)
-!          NMAT=NEL(NDIM+1,iel)
-!        WRITE (3,*)"PORNA CELIJA", II, NPOREL(II),(CPOR(ijk,II), ijk=1,3)
-!        WRITE(3,*) DMIN,RMIN(II),SMIN(II),TMIN(II),NMAT 
-!       enddo
         IF ((ISOLVER.EQ.-11).OR.(ISOLVER.EQ.1)) THEN
 C         MUMPS - full Njutn
           CALL sparseassembler_init(1)
@@ -3344,11 +3373,6 @@ C INCIJALIZACIJA MATRICE SKEF I F36
 C
 C INTEGRACIJA U GAUSOVIM TACKAMA
 C
-C sneza 11.02.2012
-c       DO II=1,NDIM
-c         PR1(II)=TT21(II)-CORD(IOSA,NEL(II,NBREL))
-c        ENDDO
-
       NGAUS=0
       POVREL=0.
       IBRGT1=IBRGT
@@ -3392,37 +3416,6 @@ c        ENDDO
       
       POVREL=POVREL+WDT
       
-Cs ovaj uslov nije isti za stacionarno i nestacionarno
-Cs za nestacionarno proverava u svakoj iteraciji 
-!       IF ( (((ITER.GT.0).AND.(kkorak.EQ.1))
-!      1.OR.KKORAK.GT.1) .AND.(INDFS.EQ.1)) THEN
-C      IF ( (((ITER.GT.0).AND.(NSTAC.EQ.1))
-C     1.OR.((KKORAK.GT.0).AND.(NSTAC.EQ.0))) .AND.(INDFS.EQ.1)) THEN
-C
-!        PR=0.D0
-! C okvasenost u gausovoj tacki
-!         DO II=1,NDIMEL
-!          PR=PR+H(II)*(TT21(II)-CORD(IOSA,NEL(II,NBREL)))
-!         ENDDO
-! 
-!            IF( PR.LT.0.D0 .AND. INDFS.EQ.1 )THEN
-!             ANPUS=AKONST(3,4,NMAT)*ZASIC
-!             PERM(1,1)=ZASIC*AKONST(3,1,NMAT)
-!             PERM(2,2)=ZASIC*AKONST(3,2,NMAT)
-!             PERM(3,3)=ZASIC*AKONST(3,3,NMAT)
-!            ELSE
-!             ANPUS=0.D0
-!             PERM(1,1)=0.0D0
-!             PERM(2,2)=0.0D0
-!             PERM(3,3)=0.0D0
-! !            ENDIF
-!        ELSE
-!         PERM(1,1)=0.0D0
-!         PERM(2,2)=0.0D0
-!         PERM(3,3)=0.0D0
-!         ANPUS=0.D0
-!        ENDIF
-
       DO 165 K=1,NDIMEL
       DO 164 N=1,NDIMEL
 cz S - AM1 nije podeljeno sa dt; podeljeno sa dt prilikom pakovanja u matricu SKEF
@@ -3437,15 +3430,6 @@ cz S - AM1 nije podeljeno sa dt; podeljeno sa dt prilikom pakovanja u matricu SK
      1AKONST(3,2,NMAT)*ZVHY(K)*ZVHY(N)+AKONST(3,3,NMAT)*ZVHZ(K)*ZVHZ(N))
      2*WDT 
 !          ELSE
-!          ENDIF
-!         write(*,*) 'AKONST(3,4,NMAT),AKONST(3,5,NMAT)',AKONST(3,4,NMAT),
-!      2  AKONST(3,5,NMAT)
-!         stop
-C
-!          IF (INDFS.EQ.1) THEN
-!          PUS(K,N)=PUS(K,N)+ANPUS*H(K)*H(N)*WDT
-!          AFIFI1(K,N)=AFIFI1(K,N)+(PERM(1,1)*ZVHX(K)*ZVHX(N)+
-!      1PERM(2,2)*ZVHY(K)*ZVHY(N)+PERM(3,3)*ZVHZ(K)*ZVHZ(N))*WDT
 !          ENDIF
 !       if(NBREL.eq.1.AND.I.eq.IBRGT) then
 !          WRITE(*,*) 'NBREL',NBREL
@@ -3517,16 +3501,61 @@ C
 ! 
 !  fluks za tetra elemente
       IF(elemtip(NBREL).eq.34.or.elemtip(NBREL).eq.310) THEN
+!         write(IIZLAZ,*)'NBREL',NBREL,IFZRAC,IFLUXR(JBRPS)
+C ZRACENJE zadato preko FLUKSA        
+       IF(IFZRAC.eq.1.and.IFLUXR(JBRPS).eq.1) THEN
+C odredjivanje jedinicnog vektrora normale na stranicu elementa
+         DO I=1,3
+           A12(I)=CORD(I,NODE2)-CORD(I,NODE1)
+           A13(I)=CORD(I,NODE3)-CORD(I,NODE1)
+!            A12(I)=CORD(I,NODE1)-CORD(I,NODE2)
+!            A13(I)=CORD(I,NODE1)-CORD(I,NODE3)
+        ENDDO
+        CALL AXBV(A12,A13,DN)
+        CALL JEDV(DN(1),DN(2),DN(3))          
+c komponente jedinicnog vektora normale za zracenje
+        CALL TIMFUN (TABF,VNX,VVREME,ITFMAX(INFX),INFX)
+        CALL TIMFUN (TABF,VNY,VVREME,ITFMAX(INFY),INFY)
+        CALL TIMFUN (TABF,VNZ,VVREME,ITFMAX(INFZ),INFZ)
+!         write(IIZLAZ,*)'NBREL,DN',NBREL,DN(1),DN(2),DN(3)
+!         write(IIZLAZ,*)'INFX,INFY',INFX,INFY,INFZ
+C proizvod I*n
+        VNI=DN(1)*VNX+DN(2)*VNY+DN(3)*VNZ
+!         write(IIZLAZ,*)'VNI',VNX,VNY,VNZ,VNI
+        IF(VNI.LT.0) THEN
+          DO NGXT = 1,3
+             RT=1./6
+             ST=1./6
+             WT=1./3
+             IF(NGXT.EQ.2) RT=2./3
+             IF(NGXT.EQ.3) ST=2./3
+             CALL JACTP33(RT,ST,HT,1,NGPSIL,JBRPS,CORD,NDIMEL)
+             WDTS = WT*DETJS/2
+             DO K=2,9
+               DO J=1,NDIMEL
+                 IF(NGPSIL(K,JBRPS).EQ.NEL(J,NBREL)) THEN
+!   povrsinski fulks  j-na (1.30)                 
+           RS2(J)=RS2(J)+HT(K-1,1)*FS2*WDTS*(-VNI)*RKOREKCIJA*TIME
+                 ENDIF
+               ENDDO
+             ENDDO
+          ENDDO 
+          PFLUXEL(JBRPS)=-FS2*VNI*RKOREKCIJA*TIME
+!           write(IIZLAZ,*)'NBREL,FS2',NBREL,FS2,RKOREKCIJA,TIME
+!          write(IIZLAZ,*)'PFLUXEL',NGPSIL(1,JBRPS),PFLUXEL(JBRPS)
+        ELSE
+         GOTO 250
+        ENDIF
+       ELSE
          DO NGXT = 1,3
              RT=1./6
              ST=1./6
              WT=1./3
              IF(NGXT.EQ.2) RT=2./3
              IF(NGXT.EQ.3) ST=2./3
-
-            CALL JACTP33(RT,ST,HT,1,NGPSIL,JBRPS,CORD,NDIMEL)
-            WDTS = WT*DETJS/2
-            DO K=2,9
+             CALL JACTP33(RT,ST,HT,1,NGPSIL,JBRPS,CORD,NDIMEL)
+             WDTS = WT*DETJS/2
+             DO K=2,9
               DO J=1,NDIMEL
                  IF(NGPSIL(K,JBRPS).EQ.NEL(J,NBREL)) THEN
 !   povrsinski fulks  j-na (1.30)                 
@@ -3535,6 +3564,7 @@ C
               ENDDO
             ENDDO
          ENDDO 
+       ENDIF
 !  fluks za heksa elemente      
       ELSEIF (elemtip(NBREL).eq.38.or.elemtip(NBREL).eq.320) THEN
       
@@ -3681,6 +3711,7 @@ C ----------------------------------------
       IPROM=NELTOK(12,JBRPS)
 !       WRITE(3,*) "JBRPS,IPROM",JBRPS,IPROM
 !        WRITE(3,*) "JBRPS,NBREL",JBRPS,NELTOK(1,JBRPS)
+       FCONEL(JBRPS)=NELTOK(10,JBRPS)
       IF(IPROM.EQ.1.OR.IPROM.EQ.3) THEN
         IVODE=NELTOK(10,JBRPS)/1000000
         IVRFH1=NELTOK(10,JBRPS)/1000-IVODE*1000
@@ -3700,6 +3731,8 @@ C ----------------------------------------
         ELSE
             CALL TIMFUN (TABF,FK1TOK,VVREME,ITFMAX(IVRFTOK2),IVRFTOK2)
         ENDIF
+       TOKOLINEL(JBRPS)=FK1TOK
+C zavisna voda - donja voda za Djerdap        
         IF(WATER(2,IVODE).NE.0) THEN
             IPOM111=WATER(2,IVODE)
             IVRFVODE_DEP=WATER(3,IPOM111)
@@ -3770,19 +3803,36 @@ C Temperatura okoline je u funkciji vremena
         IVRFSENSOR=SENSOR(3,1)
         CALL TIMFUN (TABF,FSENSOR(1),VVREME,ITFMAX(IVRFSENSOR)
      1                   ,IVRFSENSOR)
-        IVRFSENSOR=SENSOR(3,2)
+        IF (FWATER.GE.PREKIDNAFR) THEN
+           IVRFSENSOR=SENSOR(3,2)
+           HSENSOR2=HSENSOR(2)
+        ELSE
+           IVRFSENSOR=SENSOR(3,3)      
+           HSENSOR2=HSENSOR(3)
+           IF(FWATER.LT.350.0) THEN
+            write(*,*) 'nivo u akumulaciji ispod 350', FWATER
+            write(3,*) 'nivo u akumulaciji ispod 350', FWATER
+            ENDIF
+        ENDIF
         CALL TIMFUN (TABF,FSENSOR(2),VVREME,ITFMAX(IVRFSENSOR)
      1                   ,IVRFSENSOR)
         CALL TIMFUN (TABF,FK1TOK,VVREME,ITFMAX(IVRFTOK1),IVRFTOK1)
-!          WRITE(3,*) "WATER(2,IVODE)",WATER(2,IVODE)
+!         WRITE(3,*) "IVODE,WATER(2,IVODE)",IVODE,WATER(2,IVODE)
         IF(WATER(2,IVODE).EQ.0) THEN
-!           WRITE(3,*) "FWATER,HSENSOR(1),HSENSOR(2),HFACE(JBRPS)",FWATER
+!            WRITE(3,*) "FWATER,HSENSOR(1),HSENSOR(2),HFACE(JBRPS)",FWATER
 !      1            ,HSENSOR(1),HSENSOR(2),HFACE(JBRPS)
-          CALL LININTGV(FWATER-HSENSOR(1),FWATER-HSENSOR(2),
+!            WRITE(3,*) "FSENSOR(1),FSENSOR(2)",FSENSOR(1),FSENSOR(2)
+!  DJERDAP
+!           CALL LININTGV(FWATER-HSENSOR(1),FWATER-HSENSOR(2),
+!      1     FSENSOR(1),FSENSOR(2),FK1TOK,
+!      2                          0,FWATER-HFACE(JBRPS))
+!  GRANCAREVO
+          CALL LININTGV(FWATER-HSENSOR(1),FWATER-HSENSOR2,
      1     FSENSOR(1),FSENSOR(2),FK1TOK,
      2                          0,FWATER-HFACE(JBRPS))
 !         WRITE(3,*) "FK1TOK,TBOFANG",FK1TOK,TBOFANG
-!            WRITE(3,*) "FK1TOK",FK1TOK
+!             WRITE(3,*) "FK1TOK",FK1TOK
+C nema donje vode za Grancarevo
         ELSE
 !           WRITE(3,*) "FWATER_DEP,HSENSOR(1),HSENSOR(2),D_BOFANG",
 !      1            FWATER_DEP,HSENSOR(1),HSENSOR(2),D_BOFANG
@@ -3817,6 +3867,7 @@ C
 !       write(3,*) "IVRFH",IVRFH
 !       write(3,*) "IVRFTOK",IVRFTOK
 !       write(3,*) "FK1TOK",FK1TOK
+      TOKOLINEL(JBRPS)=FK1TOK
       NUMGAU=IBRGT
 !  proveriti prelaznost za 1D element      
       IF(elemtip(NBREL).eq.12.or.elemtip(NBREL).eq.13) THEN
@@ -3837,9 +3888,13 @@ C odredjivanje koeficijenta prelaznosti HHP u zavisnosti od temperature
                 CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH1),IVRFH1)
             ELSE
                 CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH2),IVRFH2)
+                FCONEL(JBRPS)=IVRFH2
+!             write(3,*) "NBREL,IVRFH2",NBREL,IVRFH2
             ENDIF
           ELSE
             CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH),IVRFH)
+            FCONEL(JBRPS)=IVRFH
+!          write(3,*) "NBREL,IVRFH",NBREL,IVRFH
           ENDIF
           DO K=1,NDIMEL
             RS2(K)=RS2(K)+H(K)*HHP*WDTV*TTT
@@ -3891,11 +3946,18 @@ C odredjivanje koeficijenta prelaznosti HHP u zavisnosti od temperature
           IF(IPROM.EQ.1.OR.IPROM.EQ.3) THEN
             IF(HFACE(JBRPS).GT.FWATER) THEN
                 CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH1),IVRFH1)
+C   stampa ID funkcije za koeficijent prelaznosti
+                FCONEL(JBRPS)=IVRFH1
+!             write(3,*) "NBREL,IVRFH1",NBREL,IVRFH1
             ELSE
                 CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH2),IVRFH2)
+                FCONEL(JBRPS)=IVRFH2
+!             write(3,*) "NBREL,IVRFH2",NBREL,IVRFH2
             ENDIF
           ELSE
             CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH),IVRFH)
+            FCONEL(JBRPS)=IVRFH
+!             write(3,*) "NBREL,IVRFH",NBREL,IVRFH
           ENDIF
 C
              DO K=2,8
@@ -4165,6 +4227,8 @@ C KRAJ PETLJE PO ELEMENTIMA
 C=======================================================================
  400  CONTINUE
 !       WRITE(*,*) "posle petlje po elementima"
+        CALL DATE_AND_TIME(VALUES=Dtime)
+        WRITE(*,*) 'posle petlje po elementima', (Dtime(i),i=5,7)
 C=======================================================================
 C CVOROVI NA LINIJI PROCURIVANJA       
 C=======================================================================
@@ -4244,6 +4308,8 @@ cz proveriti rad sa blokovima i zadlev
 
           ENDIF
           endif
+        CALL DATE_AND_TIME(VALUES=Dtime)
+        WRITE(*,*) 'pre ZADLEV', (Dtime(i),i=5,7)
           
           IF(ISOLVER.EQ.0) THEN
             if(myid.eq.0) CALL ZADLEV(A(LSK),MAXA,A(LNZADJ),NUMZAD,NZAD)
@@ -4251,8 +4317,12 @@ cz proveriti rad sa blokovima i zadlev
             if(myid.eq.0) CALL SPARS_ZADLEV(A(LNZADJ),NUMZAD,NZAD,
      1                                  CORD,VVREME,TABF,NTABFT,ITFMAX)
           ENDIF
+        CALL DATE_AND_TIME(VALUES=Dtime)
+        WRITE(*,*) 'posle ZADLEV', (Dtime(i),i=5,7)
           CALL RESEN(A(LSK),TT10,MAXA,JEDN,1)
         ENDIF
+        CALL DATE_AND_TIME(VALUES=Dtime)
+        WRITE(*,*) 'posle RESEN', (Dtime(i),i=5,7)
 !         ENDIF
 
        TOL=1.0D-7
@@ -4384,6 +4454,8 @@ cz          if(nasilu.eq.0) then
             GO TO 100
           ENDIF
         endif 
+        CALL DATE_AND_TIME(VALUES=Dtime)
+        WRITE(*,*) 'pre racunanja gradijenta', (Dtime(i),i=5,7)
 
         IF ((NJUTN.NE.0).AND.(INDOPT.EQ.0)) RETURN
 
@@ -4504,27 +4576,13 @@ C INDIKATOR NJUTN-KOTESOVE INTEGRACIJE (0-NE,1-DA)
 	ENDIF
         VZAPR=VZAPR+WDT
 C
-C OKVASENOST U GAUS TACKI - nema pornih pritisaka u termici
-!         PR=0.D0
-!         DO II=1,NDIMEL
-!            PR=PR+H(II)*(TT21(II)-CORD(IOSA,NEL(II,NBREL)))
-!        ENDDO
-!         OKVAS=0.
-!         IF(PR.GT.0.D0) OKVAS=1.
-! c porni pritisak u gaus tacki
-!         porni=pr*gama
-!         IF(PR.GT.0.D0) PORNIEL(NBREL,NGAUS)=porni
-C      write(iizlaz,*)NBREL,NGAUS,PORNIEL(NBREL,NGAUS)
 C=======================================================================
 C RACUNANJE GRADIJENTA TEMPERATURE:
 C
       GRADFX=0.D0
       GRADFY=0.D0
       GRADFZ=0.D0
-C ISKLJUCENO DA NE RACUNA FILTRACIONE SILE I SILE OD PORNIH PRITISAKA      
-!       IF(PR.GT.0.D0) THEN
-C      IF(PR.GT.0.D0.OR.ISIL.EQ.0) THEN
-C RACUNANJE GRADIJENTA POTENCIJALA
+C RACUNANJE GRADIJENTA TEMPERATURE
           DO II=1,NDIMEL
             GRADFX=GRADFX+ZVHX(II)*TT21(II)
             GRADFY=GRADFY+ZVHY(II)*TT21(II)
@@ -4533,17 +4591,10 @@ C RACUNANJE GRADIJENTA POTENCIJALA
 C
 C         
 !       ENDIF
-
-!       IF ( (PR.LT.0.D0) .AND. (INDFS.EQ.1) )THEN
-!          AKX=(1.D0-ZASIC)*AKONST(3,1,NMAT)
-!          AKY=(1.D0-ZASIC)*AKONST(3,2,NMAT)
-!          AKZ=(1.D0-ZASIC)*AKONST(3,3,NMAT)
-!       ELSE
          AKX=AKONST(3,1,NMAT)
          AKY=AKONST(3,2,NMAT)
          AKZ=AKONST(3,3,NMAT)
 !       ENDIF
-
 C GRADIJENT U GAUS TACKI
        AJX1(NGAUS)=GRADFX
        AJY1(NGAUS)=GRADFY
@@ -4563,7 +4614,7 @@ C
 !       CASE DEFAULT
 !         WRITE(*,*) 'ELEMENT TYPE UNKNOWN NETIP=',elemtip(NBREL)
 !       END SELECT
-      
+  
       IMCVOR=0
       IVAL=0
       SELECT CASE(elemtip(NBREL))
@@ -4613,10 +4664,6 @@ C
           END SELECT
 	  IF(KOTES.EQ.1) KK1=NREDK(KK)
 	  IF(KK.LE.IVAL.OR.IMCVOR.EQ.0) THEN
-! C BRZINE U CVOROVIMA
-!           VECTJ(1,NCVOR)=VECTJ(1,NCVOR)+AJX(KK1)/IVECT(NCVOR)
-!           VECTJ(2,NCVOR)=VECTJ(2,NCVOR)+AJY(KK1)/IVECT(NCVOR)
-!           VECTJ(3,NCVOR)=VECTJ(3,NCVOR)+AJZ(KK1)/IVECT(NCVOR)
 C GRADIJENT Temperature U CVOROVIMA
 	  GRADJN(1,NCVOR)=GRADJN(1,NCVOR)+AJX1(KK1)/IVECT(NCVOR)
 	  GRADJN(2,NCVOR)=GRADJN(2,NCVOR)+AJY1(KK1)/IVECT(NCVOR)
@@ -4624,13 +4671,6 @@ C GRADIJENT Temperature U CVOROVIMA
           ELSE IF(KK.GT.IVAL.AND.IMCVOR.EQ.1) THEN
           KK2=KK1/10
           KK3=KK1-KK2*10
-C BRZINE U CVOROVIMA
-!           VECTJ(1,NCVOR)=VECTJ(1,NCVOR)+(AJX(KK2)/IVECT(NCVOR))/2
-!      1                                 +(AJX(KK3)/IVECT(NCVOR))/2
-!           VECTJ(2,NCVOR)=VECTJ(2,NCVOR)+(AJY(KK2)/IVECT(NCVOR))/2
-!      1                                 +(AJY(KK3)/IVECT(NCVOR))/2
-!           VECTJ(3,NCVOR)=VECTJ(3,NCVOR)+(AJZ(KK2)/IVECT(NCVOR))/2
-!      1                                 +(AJZ(KK3)/IVECT(NCVOR))/2
 C GRADIJENT Temperature U CVOROVIMA
           GRADJN(1,NCVOR)=GRADJN(1,NCVOR)+(AJX1(KK2)/IVECT(NCVOR))/2
      1                                   +(AJX1(KK3)/IVECT(NCVOR))/2
@@ -4656,7 +4696,16 @@ C        CALL PRKONT1c(TT1,ID,UBRZ,CORD,NZAD,IOSA,IVECT,ZADVRE,KOJK)
 C stampanje dubine vode
 C       CALL STAU09c(TT1,CORD,ID,NPT,49,11,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
 C stampa rezultata u neu za sve cvorove STAS09T
-        CALL STAS09T(TT1,CORD,ID,NPT,49,10,1,KKORAK,NZAD,NUMZAD,KONT)
+C stampanje elemenata nakojima je zadat flux
+        IF(MAXSIL.GT.0) 
+     1  CALL STAS09T(ID,NPT,49,10,1,KKORAK,NGPSIL,MAXSIL)
+!  stampanje elemenata na kojima je zadata prelaznost - stampa se ID f-je koef. prelaznosti
+        IF(MAXTQE.GT.0)THEN 
+          CALL STAS09T(ID,NPT,49,12,1,KKORAK,NGPSIL,MAXTQE)
+!  stampanje temperature prema Bofangu
+          CALL STAS09T(ID,NPT,49,19,1,KKORAK,NGPSIL,MAXTQE)
+        ENDIF
+! 
        CALL STAU09T(TT1,CORD,ID,NPT,49,9,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
        CALL STAU09T(TT1,CORD,ID,NPT,49,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
 !  DUBINA VODE

@@ -1639,14 +1639,13 @@ C
  1017 FORMAT('P11-',I2,I10,1PD12.4)
  1018 FORMAT('P16-',I2,I10,1PD12.4)
  5000 FORMAT(I10,3(1PE12.4))
- 5010 FORMAT(A10,4(1PE12.4))
+ 5010 FORMAT(A15,4(1PE12.4))
  5001 FORMAT(3(I10),2(1PE12.4))
       END
 C=======================================================================
+C Stampanje POTENCIJALA U DODATNIM CVOROVIMA ZA CRTANJE REZULTATA
 C=======================================================================
-C Stampanje brzine na mestu termometara
-C=======================================================================
-      SUBROUTINE STAU09CTV(RTH,CORD,II,VREME,KORAK,NEL)
+      SUBROUTINE STAU09CDP(RTH,CORD,II,VREME,KORAK,NEL)
       USE MESURMENTPOINTS
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 C
@@ -1654,33 +1653,21 @@ C
 C      COMMON /ELECTR/ INDJOT,INDFS
 C      COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
 !       COMMON /VOPTIM/ NKONT,MAXLIN,LIN(10)
-      DIMENSION RTH(3,*),CORD(3,*)
+      DIMENSION RTH(1,*),CORD(3,*)
       DIMENSION NEL(NDIMM,*)
       DIMENSION H(10)
-!       COMMON /PIJEZO/ CPOR(3,1000),NPIJEZ(20,100),NODP(100),NPIJ,NPOR,
-!      1                NPORCV(1000),NPOREL(1000),NEPOR,NPORE,NEPIJ
-!       COMMON /PORCEL/ RMIN(34),SMIN(34),TMIN(34)
-C
-!       IF(NEPIJ.EQ.0) GO TO 100
 C
       MJ=-1
 C       
-      IF(MAX_MPOINTS.LE.0) RETURN
+      IF(MAX_DPOINTS.LE.0) RETURN
          WRITE(II,5000) MJ
 
  4001    format(6f10.2)
-C porne celije
-C      if(npor.gt.0) then
-C         WRITE(II,5000) MJ
-C         DO 13 I=1,npor
-C            WRITE(II,5000) nporcv(i),RTH(1,nporcv(i))
-C   13    CONTINUE
-C         WRITE(II,5000) MJ
-C      endif
-C Termometri ekstrapolacija
+C Dodatne tacke - ekstrapolacija
          WRITE(II,5000) MJ
          WRITE(II,1010) VREME
-         DO 14 I=1,MAX_MPOINTS
+         WRITE(II,*) "POTENCIJAL"
+         DO 14 I=1,MAX_DPOINTS
 C ODREDJIVANJE POTENCIJALA na mestu termometra
 C za heksa elemente
 C              RPP=1.0+RMIN(I)
@@ -1704,9 +1691,9 @@ C              H(6)=0.125*RM*SPP*TM
 C              H(7)=0.125*RM*SM*TM
 C              H(8)=0.125*RPP*SM*TM
 C TETRA ELEMENTI SA 10 CVOROVA
-              RMIN=MP_COORDS(4,I)
-              SMIN=MP_COORDS(5,I)
-              TMIN=MP_COORDS(6,I)
+              RMIN=DP_COORDS(4,I)
+              SMIN=DP_COORDS(5,I)
+              TMIN=DP_COORDS(6,I)
               RST=1.0-RMIN-SMIN-TMIN
               DO IH=1,10
                 H(IH)=0.
@@ -1726,25 +1713,149 @@ C TETRA ELEMENTI SA 10 CVOROVA
             YPC=0.
             ZPC=0.
             DO JJH=1,10
-              ncvor=NEL(JJH,MP_ELEMENT(I))          
-              PPC=PPC + H(JJH)*RTH(2,ncvor)
+              ncvor=NEL(JJH,DP_ELEMENT(I))          
+              PPC=PPC + H(JJH)*RTH(1,ncvor)
               XPC=XPC+H(JJH)*CORD(1,ncvor)
               YPC=YPC+H(JJH)*CORD(2,ncvor)
               ZPC=ZPC+H(JJH)*CORD(3,ncvor)
-C  NEMA ZA TEMPERATURE OVOG USLOVA       if(ppc.lt.zpc) ppc=0.D0                
-C              WRITE(II,5001) I,ncvor,MP_ELEMENT(I),H(JJH),RTH(1,ncvor)
+            if(PPC.lt.ZPC) PPC=0.D0                
+!               WRITE(II,5001) I,ncvor,DP_ELEMENT(I),H(JJH),RTH(1,ncvor)
            enddo
 C
-            MP_RESULTS(KORAK,I+1)=PPC
-            WRITE(II,5010) MPOINT_ID(I),PPC,XPC,YPC,ZPC
+            DP_RESULTS(KORAK,1,I+1)=PPC
+            WRITE(II,5010) DPOINT_ID(I),PPC
+!             WRITE(II,5010) DPOINT_ID(I),PPC,XPC,YPC,ZPC
    14    CONTINUE
          WRITE(II,5000) MJ
-         MP_VREME(KORAK)=VREME
+!          DP_VREME(KORAK)=VREME
 !          write(3,*) 'KORAK',KORAK
 !           write(3,*) 'MP_RESULTS(KORAK,2)',MP_RESULTS(KORAK,2)
 !          if(korak.eq.BRKORAKA) then
 !             do ikbr=1,BRKORAKA
 !               write(3,*) 'MP_RESULTS(',ikbr,',2)',MP_RESULTS(ikbr,2)
+!             enddo
+!          endif
+C
+      RETURN
+ 1000 FORMAT(10I6)
+ 1001 FORMAT(I10,F12.4)
+ 3001 FORMAT('POTENTIAL')
+ 1005 FORMAT('PAK CASE',I5)
+ 1006 FORMAT('CASE',I5,' TIME',1PD12.4)
+ 1010 FORMAT(1PD12.4)
+ 1015 FORMAT('P-',I2,I10,1PD12.4)
+ 1016 FORMAT('P07-',I2,I10,1PD12.4)
+ 1017 FORMAT('P11-',I2,I10,1PD12.4)
+ 1018 FORMAT('P16-',I2,I10,1PD12.4)
+ 5000 FORMAT(I10,3(1PE12.4))
+ 5010 FORMAT(A15,4(1PE12.4))
+ 5001 FORMAT(3(I10),2(1PE12.4))
+      END
+C=======================================================================
+C=======================================================================
+C Stampanje brzine U DODATNIM TACKAMA ZA REZULTATE
+C=======================================================================
+      SUBROUTINE STAU09CDV(RTH,CORD,II,VREME,KORAK,NEL)
+      USE MESURMENTPOINTS
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+C
+      COMMON /DODAT/ NDIMM
+C      COMMON /ELECTR/ INDJOT,INDFS
+C      COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
+!       COMMON /VOPTIM/ NKONT,MAXLIN,LIN(10)
+      DIMENSION RTH(3,*),CORD(3,*)
+      DIMENSION NEL(NDIMM,*)
+      DIMENSION H(10)
+!       COMMON /PIJEZO/ CPOR(3,1000),NPIJEZ(20,100),NODP(100),NPIJ,NPOR,
+!      1                NPORCV(1000),NPOREL(1000),NEPOR,NPORE,NEPIJ
+!       COMMON /PORCEL/ RMIN(34),SMIN(34),TMIN(34)
+C
+!       IF(NEPIJ.EQ.0) GO TO 100
+C
+      MJ=-1
+C       
+      IF(MAX_DPOINTS.LE.0) RETURN
+         WRITE(II,5000) MJ
+
+ 4001    format(6f10.2)
+C porne celije
+C      if(npor.gt.0) then
+C         WRITE(II,5000) MJ
+C         DO 13 I=1,npor
+C            WRITE(II,5000) nporcv(i),RTH(1,nporcv(i))
+C   13    CONTINUE
+C         WRITE(II,5000) MJ
+C      endif
+C Termometri ekstrapolacija
+         WRITE(II,5000) MJ
+         WRITE(II,1010) VREME
+         WRITE(II,*) "Brzine"
+         DO 14 I=1,MAX_DPOINTS
+C ODREDJIVANJE POTENCIJALA na mestu termometra
+C za heksa elemente
+C              RPP=1.0+RMIN(I)
+C              SPP=1.0+SMIN(I)
+C              TPP=1.0+TMIN(I)
+C              RM=1.0-RMIN(I)
+C              TM=1.0-TMIN(I)
+C              SM=1.0-SMIN(I)
+C              RR=1.0-RMIN(I)*RMIN(I)
+C              SS=1.0-SMIN(I)*SMIN(I)
+C              TT=1.0-TMIN(I)*TMIN(I)
+C              DO IH=1,8
+C                H(IH)=0.
+C              ENDDO
+C              H(1)=0.125*RPP*SPP*TPP
+C              H(2)=0.125*RM*SPP*TPP
+C              H(3)=0.125*RM*SM*TPP
+C              H(4)=0.125*RPP*SM*TPP
+C              H(5)=0.125*RPP*SPP*TM
+C              H(6)=0.125*RM*SPP*TM
+C              H(7)=0.125*RM*SM*TM
+C              H(8)=0.125*RPP*SM*TM
+C TETRA ELEMENTI SA 10 CVOROVA
+              RMIN=DP_COORDS(4,I)
+              SMIN=DP_COORDS(5,I)
+              TMIN=DP_COORDS(6,I)
+              RST=1.0-RMIN-SMIN-TMIN
+              DO IH=1,10
+                H(IH)=0.
+              ENDDO
+              H(5)=4*RMIN*RST
+              H(6)=4*RMIN*SMIN
+              H(7)=4*SMIN*RST
+              H(8)=4*TMIN*RST
+              H(9)=4*RMIN*TMIN
+              H(10)=4*SMIN*TMIN
+              H(1)=RST-0.5*(H(5)+H(7)+H(8))
+              H(2)=RMIN-0.5*(H(5)+H(6)+H(9))
+              H(3)=SMIN-0.5*(H(6)+H(7)+H(10))
+              H(4)=TMIN-0.5*(H(8)+H(9)+H(10))
+            PPC=0.
+            XPC=0.
+            YPC=0.
+            ZPC=0.
+            DO JJH=1,10
+              ncvor=NEL(JJH,DP_ELEMENT(I))          
+              PPC=PPC + H(JJH)*RTH(2,ncvor)
+              XPC=XPC+H(JJH)*CORD(1,ncvor)
+              YPC=YPC+H(JJH)*CORD(2,ncvor)
+              ZPC=ZPC+H(JJH)*CORD(3,ncvor)
+!               if(PPC.lt.ZPC) PPC=0.D0                
+C              WRITE(II,5001) I,ncvor,DP_ELEMENT(I),H(JJH),RTH(1,ncvor)
+           enddo
+C
+            DP_RESULTS(KORAK,2,I+1)=PPC
+            WRITE(II,5010) DPOINT_ID(I),PPC
+!             WRITE(II,5010) DPOINT_ID(I),PPC,XPC,YPC,ZPC
+   14    CONTINUE
+         WRITE(II,5000) MJ
+!          DP_VREME(KORAK)=VREME
+!          write(3,*) 'KORAK',KORAK
+!           write(3,*) 'DP_RESULTS(KORAK,2)',DP_RESULTS(KORAK,2)
+!          if(korak.eq.BRKORAKA) then
+!             do ikbr=1,BRKORAKA
+!               write(3,*) 'DP_RESULTS(',ikbr,',2)',DP_RESULTS(ikbr,2)
 !             enddo
 !          endif
 C
@@ -1760,6 +1871,123 @@ C
  1018 FORMAT('P16-',I2,I10,1PD12.4)
  5000 FORMAT(I10,3(1PE12.4))
  5010 FORMAT(A10,4(1PE12.4))
+ 5001 FORMAT(3(I10),2(1PE12.4))
+      END
+C=======================================================================
+C Stampanje POTENCIJALA i BRZINE U DODATNIM CVOROVIMA ZA CRTANJE REZULTATA
+C=======================================================================
+      SUBROUTINE STAU09CDPV(RTH,RTH1,CORD,II,VREME,KORAK,NEL)
+      USE MESURMENTPOINTS
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+C
+      COMMON /DODAT/ NDIMM
+C      COMMON /ELECTR/ INDJOT,INDFS
+C      COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
+!       COMMON /VOPTIM/ NKONT,MAXLIN,LIN(10)
+      DIMENSION RTH(1,*),RTH1(3,*),CORD(3,*)
+      DIMENSION NEL(NDIMM,*)
+      DIMENSION H(10)
+C
+      MJ=-1
+C       
+      IF(MAX_DPOINTS.LE.0) RETURN
+!          WRITE(II,5000) MJ
+
+ 4001    format(6f10.2)
+C Dodatne tacke - ekstrapolacija
+!          WRITE(II,5000) MJ
+!          WRITE(II,1010) VREME
+         WRITE(II,*) "ID tacke, POTENCIJAL, BRZINA"
+         DO 14 I=1,MAX_DPOINTS
+C ODREDJIVANJE POTENCIJALA na mestu termometra
+C za heksa elemente
+C              RPP=1.0+RMIN(I)
+C              SPP=1.0+SMIN(I)
+C              TPP=1.0+TMIN(I)
+C              RM=1.0-RMIN(I)
+C              TM=1.0-TMIN(I)
+C              SM=1.0-SMIN(I)
+C              RR=1.0-RMIN(I)*RMIN(I)
+C              SS=1.0-SMIN(I)*SMIN(I)
+C              TT=1.0-TMIN(I)*TMIN(I)
+C              DO IH=1,8
+C                H(IH)=0.
+C              ENDDO
+C              H(1)=0.125*RPP*SPP*TPP
+C              H(2)=0.125*RM*SPP*TPP
+C              H(3)=0.125*RM*SM*TPP
+C              H(4)=0.125*RPP*SM*TPP
+C              H(5)=0.125*RPP*SPP*TM
+C              H(6)=0.125*RM*SPP*TM
+C              H(7)=0.125*RM*SM*TM
+C              H(8)=0.125*RPP*SM*TM
+C TETRA ELEMENTI SA 10 CVOROVA
+              RMIN=DP_COORDS(4,I)
+              SMIN=DP_COORDS(5,I)
+              TMIN=DP_COORDS(6,I)
+              RST=1.0-RMIN-SMIN-TMIN
+              DO IH=1,10
+                H(IH)=0.
+              ENDDO
+              H(5)=4*RMIN*RST
+              H(6)=4*RMIN*SMIN
+              H(7)=4*SMIN*RST
+              H(8)=4*TMIN*RST
+              H(9)=4*RMIN*TMIN
+              H(10)=4*SMIN*TMIN
+              H(1)=RST-0.5*(H(5)+H(7)+H(8))
+              H(2)=RMIN-0.5*(H(5)+H(6)+H(9))
+              H(3)=SMIN-0.5*(H(6)+H(7)+H(10))
+              H(4)=TMIN-0.5*(H(8)+H(9)+H(10))
+            PPC=0.
+            PPC1=0.
+            PPC2=0.
+            PPC3=0.
+            XPC=0.
+            YPC=0.
+            ZPC=0.
+            DO JJH=1,10
+              ncvor=NEL(JJH,DP_ELEMENT(I))          
+              PPC=PPC + H(JJH)*RTH(1,ncvor)
+              PPC1=PPC1 + H(JJH)*RTH1(1,ncvor)
+              PPC2=PPC2 + H(JJH)*RTH1(2,ncvor)
+              PPC3=PPC3 + H(JJH)*RTH1(3,ncvor)
+              XPC=XPC+H(JJH)*CORD(1,ncvor)
+              YPC=YPC+H(JJH)*CORD(2,ncvor)
+              ZPC=ZPC+H(JJH)*CORD(3,ncvor)
+            if(PPC.lt.ZPC) THEN
+              PPC=0.D0                
+              PPC1=0.D0                
+              PPC2=0.D0                
+              PPC3=0.D0                
+            endif
+!               WRITE(II,5001) I,ncvor,DP_ELEMENT(I),H(JJH),RTH(1,ncvor)
+           enddo
+           PPCV=SQRT(PPC1*PPC1+PPC2*PPC2+PPC3*PPC3)
+C
+            DP_RESULTS(KORAK,1,I+1)=PPC
+            DP_RESULTS(KORAK,2,I+1)=PPCV
+            WRITE(II,5010) DPOINT_ID(I),PPC,PPCV
+!             WRITE(II,5010) DPOINT_ID(I),PPC,XPC,YPC,ZPC
+   14    CONTINUE
+!          WRITE(II,5000) MJ
+!          DP_VREME(KORAK)=VREME
+!          write(3,*) 'KORAK',KORAK
+!           write(3,*) 'MP_RESULTS(KORAK,2)',MP_RESULTS(KORAK,2)
+!          if(korak.eq.BRKORAKA) then
+!             do ikbr=1,BRKORAKA
+!               write(3,*) 'MP_RESULTS(',ikbr,',2)',MP_RESULTS(ikbr,2)
+!             enddo
+!          endif
+C
+      RETURN
+ 1000 FORMAT(10I6)
+ 1001 FORMAT(I10,F12.4)
+ 3001 FORMAT('POTENTIAL')
+ 1005 FORMAT('PAK CASE',I5)
+ 1006 FORMAT('CASE',I5,' TIME',1PD12.4)
+ 1010 FORMAT(1PD12.4)
+ 5010 FORMAT(A15,",",2(1PE12.4,","))
  5001 FORMAT(3(I10),2(1PE12.4))
       END
 C=======================================================================
@@ -2346,15 +2574,16 @@ c      IF(EFEK.GT.1.D-19) S(7)=DSQRT(EFEK)
 C======================================================================
 C ZA TEMPERATURE
 C======================================================================
-      SUBROUTINE STAS09T(RTH,CORD,ID,NPP,II,IND,IKOL,KOR,NZAD,NUMZAD,
-     +                  KONT)
-      USE KONTURE
+      SUBROUTINE STAS09T(ID,NPP,II,IND,IKOL,KOR,NGPSIL,MAXSIL)
+       USE PREDISCRIBED
+       USE pflux
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 C
-      COMMON /VOPTIM/ NKONT,MAXLIN
-      DIMENSION RTH(IKOL,*),CORD(3,*),ID(1,*),FSP(6),IN(8),NZAD(3,*)
-      DIMENSION KONT(9,MAXLIN,*)
-      DIMENSION KONT1(40000)
+!       COMMON /VOPTIM/ NKONT,MAXLIN
+      DIMENSION ID(1,*),FSP(6),IN(8),NGPSIL(12,*)
+      integer*8 NGPSIL
+!       DIMENSION KONT(9,MAXLIN,*)
+!       DIMENSION KONT1(40000)
 C
       JEDAN=1
       NULA=0
@@ -2383,19 +2612,21 @@ C
       IN(8)=IND+7
 C
 C PRIVREMENO
-      IF(IN(1).EQ.10) THEN
-      DO I=1,40000
-         KONT1(I)=0
-      ENDDO
-      ENDIF
+!       IF(IN(1).EQ.10) THEN
+!       DO I=1,40000
+!          KONT1(I)=0
+!       ENDDO
+!       ENDIF
 C      
+!       Write(*,*) "neu, ind, maxsil",IND,MAXSIL
       IP=0
 C
    30 IP=IP+1
       WRITE(II,1000) KOR,IN(IP),JEDAN
       IF(IN(1).EQ.1.AND.IP.EQ.1) WRITE(II,3001) 
-      IF(IN(1).EQ.9.AND.IP.EQ.1) WRITE(II,3002) 
+      IF(IN(1).EQ.19.AND.IP.EQ.1) WRITE(II,3002) 
       IF(IN(1).EQ.10.AND.IP.EQ.1) WRITE(II,3003) 
+      IF(IN(1).EQ.12.AND.IP.EQ.1) WRITE(II,3012) 
       IF(IN(1).EQ.41.AND.IP.EQ.1) WRITE(II,3041) 
       IF(IN(1).EQ.41.AND.IP.EQ.2) WRITE(II,3042) 
       IF(IN(1).EQ.41.AND.IP.EQ.3) WRITE(II,3043) 
@@ -2423,8 +2654,9 @@ C     NODAL(7) ,ELEMENTAL(8)
 C dodat sledeci red za verziju neu fajla 10.0 /Sneza 26.12.2016.
       WRITE(II,1000) NULA
       IF(IN(1).EQ.1) WRITE(II,1000) NULA,NULA,M6,M7
-      IF(IN(1).EQ.9) WRITE(II,1000) NULA,NULA,M7,M7
+      IF(IN(1).EQ.19) WRITE(II,1000) NULA,NULA,M8,M8
       IF(IN(1).EQ.10) WRITE(II,1000) NULA,NULA,M8,M8
+      IF(IN(1).EQ.12) WRITE(II,1000) NULA,NULA,M8,M8
       IF(IN(1).EQ.41.OR.IN(1).EQ.51) WRITE(II,1000) NULA,NULA,M3,M7
 C
 C =1, CAN NOT LINEARY COMBINE THIS OUTPUT
@@ -2449,24 +2681,41 @@ C      DO 10 I=1,NPP
                   IF(K.GT.0) THEN
 C OVO JE SAMO ZA 3D SLOBODNA POVRSINA
 C                     IF(RTH(1,K).GT.CORD(3,I)) FSP(J)=RTH(1,K)
-                     FSP(J)=RTH(1,K)
+!                      FSP(J)=RTH(1,K)
                   ENDIF
-               ELSEIF(IN(1).EQ.9) THEN
-                 FSP(J)=1.0D0
-                 DO L=1,NUMZAD 
-                    IF(NZAD(1,L).EQ.I) GO TO 1201
-                 ENDDO
-                 FSP(J)=0.D0
- 1201            CONTINUE
+!                ELSEIF(IN(1).EQ.9) THEN
+!                  FSP(J)=1.0D0
+!                  DO L=1,NUMZAD 
+!                     IF(NZAD(1,L).EQ.I) GO TO 1201
+!                  ENDDO
+!                  FSP(J)=0.D0
+!  1201            CONTINUE
                ELSE
-                 DO LL=1,NKONT
-                    FSP(J)=LL
-                 DO L=1,LIN(LL) 
+!                  Write(*,*) "neu, ind, maxsil",IND,MAXSIL
+!                  DO LL=1,NKONT 
+                 DO LL=1,MAXSIL
+!                     FSP(J)=LL
+!                  DO L=1,LIN(LL) 
 C                 DO LI=2,5 
 C                 DO LI=2,NNODE+1 
 C                    IF(KONT(LI,L,LL).EQ.I) THEN
-                  IEL=KONT(1,L,LL)
-                  VAL=FSP(1)
+C   zadat flux-zracenje
+                   IF(IND.EQ.10) THEN
+                    IEL=NGPSIL(1,LL)
+                    VAL=PFLUXEL(LL)
+                   ELSEIF(IND.EQ.12) THEN
+C   zadata  prelaznost, stampa ID funkcije za koeficijent prelaznosti
+                     IEL=NELTOK(1,LL)
+!                    Write(*,*) IEL
+                    VAL=FCONEL(LL)
+!                    Write(*,*) IEL,VAL
+                   ELSEIF(IND.EQ.19) THEN
+C   zadata  prelaznost, stampa temperaturu okoline na elementu
+                     IEL=NELTOK(1,LL)
+!                    Write(*,*) IEL
+                    VAL=TOKOLINEL(LL)
+!                    Write(*,*) IEL,VAL
+                   ENDIF
                   WRITE(II,5000) IEL,VAL
 C                       IF(KONT1(IEL).EQ.0) THEN
 C                          KONT1(IEL)=1
@@ -2476,27 +2725,27 @@ C                          GO TO 10
 C                       ENDIF 
 C                    ENDIF
 C                 ENDDO
-                 ENDDO
+!                  ENDDO
                  ENDDO
                  FSP(J)=0.D0
  1202            CONTINUE
                ENDIF
             ELSE
-               FSP(J)=RTH(J,I)
+!              FSP(J)=RTH(J,I)
             ENDIF
    20    CONTINUE
-         VAL=FSP(1)
-         IF(IP.EQ.1.AND.IN(1).GT.40)
-     +      VAL=DSQRT(FSP(1)*FSP(1)+FSP(2)*FSP(2)+FSP(3)*FSP(3))
-         IF(IP.EQ.2) VAL=FSP(1)
-         IF(IP.EQ.3) VAL=FSP(2)
-         IF(IP.EQ.4) VAL=FSP(3)
-C         IF(DABS(VAL).LT.1.E-12) GO TO 10
-C         IF(IN(1).EQ.10) THEN
-C            WRITE(II,5000) IEL,VAL
-C         ELSE
-C            WRITE(II,5000) I,VAL
-C         ENDIF  
+!          VAL=FSP(1)
+!          IF(IP.EQ.1.AND.IN(1).GT.40)
+!      +      VAL=DSQRT(FSP(1)*FSP(1)+FSP(2)*FSP(2)+FSP(3)*FSP(3))
+!          IF(IP.EQ.2) VAL=FSP(1)
+!          IF(IP.EQ.3) VAL=FSP(2)
+!          IF(IP.EQ.4) VAL=FSP(3)
+! C         IF(DABS(VAL).LT.1.E-12) GO TO 10
+!          IF(IN(1).EQ.10) THEN
+!             WRITE(II,5000) IEL,VAL
+! C         ELSE
+! C            WRITE(II,5000) I,VAL
+!          ENDIF  
 C   10 CONTINUE
       WRITE(II,5000) MJ,ZERO
       IF(IP.LT.4.AND.IN(1).GT.40) GO TO 30
@@ -2504,8 +2753,10 @@ C   10 CONTINUE
  1000 FORMAT(10I5)
  1001 FORMAT(I10,F12.4)
  3001 FORMAT('TEMPERATURE')
- 3002 FORMAT('PRESCRIBED TEMPERATURE')
- 3003 FORMAT('PRESCRIBED SURFACES')
+ 3002 FORMAT('TEMPERATURE-BOFANG CONVECTION')
+!  3003 FORMAT('PRESCRIBED SURFACES')
+ 3003 FORMAT('PRESCRIBED RADIATION-FLUX')
+ 3012 FORMAT('PRESCRIBED CONVECTION')
  3041 FORMAT('TOTAL VELOCITY')
  3042 FORMAT('VX VELOCITY')
  3043 FORMAT('VY VELOCITY')

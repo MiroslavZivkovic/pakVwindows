@@ -1551,8 +1551,8 @@ C
       END
 C=======================================================================
       SUBROUTINE ICLEAR8(IA,N)
-      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
-	  INTEGER*8 IA,N
+
+      integer*8 IA,N
 C
 C ......................................................................
 C .
@@ -1571,7 +1571,7 @@ C
       COMMON /CDEBUG/ IDEBUG
       DIMENSION IA(*)
 C
-      IF(IDEBUG.GT.0) PRINT *, ' ICLEAR'
+      IF(IDEBUG.GT.0) PRINT *, ' ICLEAR8'
       DO 10 I=1,N
    10 IA(I)=0
       RETURN

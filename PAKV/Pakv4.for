@@ -1292,26 +1292,34 @@ C=======================================================================
       SUBROUTINE LININTGV(Y1,Y2,TW1,TW2,TM,IND,Y)
       USE PREDISCRIBED
       INTEGER*4 IND
-      DOUBLE PRECISION FTOK,Y1,Y2,TW1,TW2,TM,TS,Y
+      DOUBLE PRECISION FTOK,Y1,Y2,TW1,TW2,TM,TS,Y,CKOEF,DELILAC
       
 !        WRITE(3,*) "IND",IND
-      IF(Y.LT.Y1) THEN
-        W=Y/Y1
-        TS=0.5*(TM+TW1)
-        IF(TS.LE.0) TS=0
-        TM=TS*(1-W)+TW1*W
-      ELSEIF(Y.GE.Y1.AND.Y.LE.Y2) THEN
-        W=(Y-Y1)/(Y2-Y1)
-        TM=TW1*(1-W)+TW2*W
-      ELSE
-        TM=TW2
-      ENDIF
-      IF(IND.EQ.1) THEN
-        W=D_BOFANG/Y1
-        TD=TS*(1-W)+TW1*W
-        TM=0.5*(TS+TD)
-!         WRITE(3,*) "D,Y1,TS,TW1,TM",D_BOFANG,Y1,TS,TW1,TM
-      ENDIF  
+!  Djerdap
+!       IF(Y.LT.Y1) THEN
+!         W=Y/Y1
+!         TS=0.5*(TM+TW1)
+!         IF(TS.LE.0) TS=0
+!         TM=TS*(1-W)+TW1*W
+!       ELSEIF(Y.GE.Y1.AND.Y.LE.Y2) THEN
+!         W=(Y-Y1)/(Y2-Y1)
+!         TM=TW1*(1-W)+TW2*W
+!       ELSE
+!         TM=TW2
+!       ENDIF
+!       IF(IND.EQ.1) THEN
+!         W=D_BOFANG/Y1
+!         TD=TS*(1-W)+TW1*W
+!         TM=0.5*(TS+TD)
+! !         WRITE(3,*) "D,Y1,TS,TW1,TM",D_BOFANG,Y1,TS,TW1,TM
+!       ENDIF  
+      DELILAC=(1-exp(-Alpha*Y1))*exp(-Alpha*Y2)
+      DELILAC=DELILAC-(1-exp(-Alpha*Y2))*exp(-Alpha*Y1)
+      CKOEF=(TW1*exp(-Alpha*Y2)-TW2*exp(-Alpha*Y1))/DELILAC
+      TS=TW2*(1-exp(-Alpha*Y1))-TW1*(1-exp(-Alpha*Y2))
+      TS=TS/DELILAC
+      TM=CKOEF+(TS-CKOEF)*exp(-Alpha*Y)
+!         WRITE(3,*) "Y1,TS,TW1,TM",Y1,TS,TW1,TM
         
       RETURN
       END
@@ -1376,6 +1384,54 @@ C=======================================================================
          PRINT*, "OUT OF INTERPOLATION SEGMENTS"
          STOP
         END SELECT
+
+      RETURN
+      END
+C=======================================================================
+      SUBROUTINE PREDF_INTERP(I,INTERPAXIS,NUMAXISPOINTS,INTAXISPOINT,
+     1                 ITFMAX,NZAD,AXISPTCORD,CORD,TABF,VVREME,FK1,IND)
+      integer*4 NZAD(3,*),ITFMAX(*),I,INTERPAXIS,IND
+      integer*8 ILOC,INDLOC,NSEG,NUMAXISPOINTS,INTAXISPOINT(2,*)
+                         
+      double precision AXISPTCORD(*),CORD(3,*),VVREME,FK1,TABF
+      double precision Fkf1,Fx2,Fn1,Fakt,Akonst,Cin
+      
+!       DO ILOC=2,NUMAXISPOINTS
+!          IF(AXISPTCORD(1).GE.CORD(INTERPAXIS,NZAD(1,I))) THEN
+!             INDLOC=1
+!             EXIT
+!          ENDIF
+!          IF(AXISPTCORD(NUMAXISPOINTS).LE.CORD(INTERPAXIS,
+!      1                                      NZAD(1,I))) THEN
+!             INDLOC=3
+!             EXIT
+!          ENDIF
+        IF(IND.EQ.1) THEN
+          Fakt=30.0
+          Akonst=301.0
+          Cin=0.332
+        ELSEIF(IND.EQ.2) THEN
+          Fakt=80.0
+          Akonst=0.0
+          Cin=1.0
+        ENDIF
+        IF(AXISPTCORD(1).LE.CORD(INTERPAXIS,NZAD(1,I)).AND.
+     1         AXISPTCORD(2).GE.CORD(INTERPAXIS,NZAD(1,I))) THEN
+!             INDLOC=2
+!             NSEG=ILOC-1
+         Fkf1=Fakt/(AXISPTCORD(1)-AXISPTCORD(2))
+         CALL TIMFUN(TABF,Fx2,VVREME,ITFMAX(INTAXISPOINT(2,2))
+     1                                      ,INTAXISPOINT(2,2))
+         Fn1=Akonst+Cin*Fx2-
+     1        Fakt*AXISPTCORD(1)/(AXISPTCORD(1)-AXISPTCORD(2))
+         FK1=Fkf1*CORD(INTERPAXIS,NZAD(1,I))+Fn1
+        ELSE
+         PRINT*, "OUT OF INTERPOLATION SEGMENTS"
+        STOP
+!             EXIT
+        ENDIF
+!        ENDDO
+!         WRITE(3,*) "INDLOC",INDLOC
 
       RETURN
       END
