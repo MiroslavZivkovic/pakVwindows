@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "PAKV", "PAKV\PAKV.vfproj", "{F769B69D-0C81-4B67-B3F9-9F882C239B2B}"
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "PAKV", "src\PAKV.vfproj", "{F769B69D-0C81-4B67-B3F9-9F882C239B2B}"
 	ProjectSection(ProjectDependencies) = postProject
 		{933FEE1C-FEEC-4146-80E1-453E5EB39FDE} = {933FEE1C-FEEC-4146-80E1-453E5EB39FDE}
 		{1A0B0B4C-6E8B-4999-8118-171609CF1CEF} = {1A0B0B4C-6E8B-4999-8118-171609CF1CEF}
@@ -29,7 +29,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scalapack", "MUMPS\WinMumps
 EndProject
 Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "scalapack_core", "MUMPS\WinMumps\VisualStudio2005\scalapack_core.vfproj", "{9FE212C3-F32E-4975-9EF1-2347FB6DA0FD}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cplusplus", "cplusplus\cplusplus.vcxproj", "{DA8FDDC9-4FDE-4AE3-AE7F-79C8B700E9A6}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cplusplus", "src\cplusplus.vcxproj", "{DA8FDDC9-4FDE-4AE3-AE7F-79C8B700E9A6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
