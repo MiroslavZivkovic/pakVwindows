@@ -1159,6 +1159,7 @@ C     1,LVG,LGG,LKOJK
                 CALL save_series(MPOINT_ID(IMP),MP_VREME,
      1             MP_RESULTS_NIZ,BRKORAKA,MAX_MPOINTS,IMP,INDMPI,isave)
        if (allocated(MP_RESULTS_NIZ)) deallocate(MP_RESULTS_NIZ)
+C      zile asus linux
 !top WINDOWS END       
         
 !busarac LINUX START      
