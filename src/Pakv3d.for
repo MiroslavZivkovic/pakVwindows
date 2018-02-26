@@ -3535,12 +3535,12 @@ C proizvod I*n
                DO J=1,NDIMEL
                  IF(NGPSIL(K,JBRPS).EQ.NEL(J,NBREL)) THEN
 !   povrsinski fulks  j-na (1.30)                 
-           RS2(J)=RS2(J)+HT(K-1,1)*FS2*WDTS*(-VNI)*RKOREKCIJA*TIME
+           RS2(J)=RS2(J)+HT(K-1,1)*FS2*WDTS*(-VNI)*RKOREKCIJA
                  ENDIF
                ENDDO
              ENDDO
           ENDDO 
-          PFLUXEL(JBRPS)=-FS2*VNI*RKOREKCIJA*TIME
+          PFLUXEL(JBRPS)=-FS2*VNI*RKOREKCIJA
 !           write(IIZLAZ,*)'NBREL,FS2',NBREL,FS2,RKOREKCIJA,TIME
 !          write(IIZLAZ,*)'PFLUXEL',NGPSIL(1,JBRPS),PFLUXEL(JBRPS)
         ELSE
