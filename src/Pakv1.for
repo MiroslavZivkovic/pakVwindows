@@ -7,6 +7,7 @@ C$DEBUG
       USE RESULTS
       USE MESURMENTPOINTS
       USE KONTURE
+      USE PRESEK
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       include 'paka.inc'
       INCLUDE 'mpif.h'
@@ -44,14 +45,14 @@ C$DEBUG
       COMMON /FLUX/ KISA
       COMMON /ZADPO/ LNZADJ
       COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
-C     novi momentar
+C
       COMMON /PRIKAZ/ INDSC,IZPOT
       COMMON /PIJEZO/ CPOR(3,1000),NPIJEZ(20,100),NODP(100),NPIJ,NPOR,
      1                NPORCV(1000),NPOREL(1000),NEPOR,NPORE,NEPIJ
       COMMON /ICITANJE/ INPT
       COMMON /SOLVER/ ISOLVER
       COMMON /NXNAST/ NXNASTRAN
-      COMMON /DJERDAP/ IDJERDAP
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
       COMMON /STAMPAZT/ NPRINT
 C
 C    DEFINISANJE MAKSIMALNE RADNE MEMORIJE U VEKTORU A
@@ -70,7 +71,10 @@ C
       CHARACTER*250 ACOZ
       CHARACTER*50 IME
       CHARACTER*54 IMECSV
-      CHARACTER*4  CSVEXT
+      CHARACTER*20 IMEPR
+      CHARACTER*2 IMECSV2
+      CHARACTER*1 IMECSV1,PREF
+      CHARACTER*53 IZIPOCT
       
 C
       CHARACTER*5 PRTOK(10)
@@ -83,7 +87,7 @@ C      DIMENSION IBFK(5,3),FAKP(5,3),TOPM(5),TMNM(5)
      *            'FLUX7','FLUX8','FLUX9','FLU10'/
       integer ierr, myid
       integer*8 LM2,INDWATER
-      integer Dtime(8)
+      integer Dtime(8),ISNUMER
 
       CALL MPI_INIT(ierr)
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
@@ -123,19 +127,23 @@ C
 C
 C==========================================================================
       CALL OTVORI
+      CALL DATE_AND_TIME(VALUES=Dtime)
+      WRITE(*,*) 'posle otvaranja dat fajla', (Dtime(i),i=5,7)
       CALL ISPITA(ACOZ)                                       
       READ(ACOZ,1000) NASLOV
  1000 FORMAT(A80)
 C==========================================================================
       CALL ISPITA(ACOZ)                                       
-      READ(ACOZ,1001) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP
+      READ(ACOZ,1001) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK
  1001 FORMAT(14I5)
 C==========================================================================
       CALL ISPITA(ACOZ)                                       
       IF(INPT.EQ.1) THEN
-       READ(ACOZ,1022) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,IANIZ,NULAZ
+       READ(ACOZ,1022) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,NULAZ,
+     1       ISNUMER
       ELSE
-       READ(ACOZ,1002) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,IANIZ,NULAZ
+       READ(ACOZ,1002) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,NULAZ,
+     1       ISNUMER
       ENDIF
       if(NSTAC.EQ.2) THEN
         isave=1
@@ -144,7 +152,7 @@ C==========================================================================
       ENDIF
 !       write(*,*)"NSTAC,isave",NSTAC,isave
  1002 FORMAT(16I5)
- 1022 FORMAT(i10,15I5)
+ 1022 FORMAT(I10,15I5)
       IF(NPER.EQ.0) NPER = 1
       IF(NGET.EQ.0) NGET = 1
       IF(NMATT.EQ.0) NMATT=1
@@ -154,13 +162,15 @@ C==========================================================================
       CALL ZAGLAV
       CALL OTVGRA
       IF(IPAKT.EQ.0) CALL OTVSIL
-      IF(IPAKT.EQ.1) CALL OTVTEMP
+      WRITE(3,*) 'posle otvaranja dat fajla', (Dtime(i),i=5,7)
+!  otvara se u pakv3d      
+!       IF(IPAKT.EQ.1) CALL OTVTEMP
       CALL OTVNEU
       WRITE(IIZLAZ,3019) NASLOV
       IF(ISRPS.EQ.0)
-     *WRITE(IIZLAZ,3020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP
+     *WRITE(IIZLAZ,3020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK
       IF(ISRPS.EQ.1)
-     *WRITE(IIZLAZ,7020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP
+     *WRITE(IIZLAZ,7020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK
  3019 FORMAT(//78('*')/,A80,/78('*')///)
 
  3020 FORMAT(//
@@ -177,33 +187,39 @@ C==========================================================================
      111X,'IZVRSAVANJE PROGRAMA PAKP/PAKT ................. IPAKT =',I5/
      116X,'EQ.0; PAKP'/
      116X,'EQ.1; PAKT'///
-     111X,'STAMPANJE ZAP.SILA/TEMP. U ODREDJEIM CVOR ....IDJERDAP =',I5/
+     111X,'STAMPANJE ZAP.SILA/TEMP U CVOROVIMA LAMELE...IDJERDAP =',I5/
      116X,'EQ.0; STAMPA U SVIM CVOROVIMA'/
-     116X,'EQ.1; STAMPA U CVOROVIMA IZ FAJLA DJ3D1/DJ3DT1'///)
+     116X,'GE.1; STAMPA U CVOROVIMA ZA LAMELU'/
+     111X,'STAMPANJE REZULTATA U PRESECIMA .............ISPRESEK =',I5/
+     116X,'EQ.0; NE STAMPAJU SE'/
+     116X,'EQ.1; STAMPAUJU SE ZA SVE PREEKE'///)
  7020 FORMAT(//
      111X,'FORMAT INDIKATOR .............................. INDFOR =',I5/
      116X,'EQ.0; INDFOR = 1'/
      116X,'EQ.1; FREE FORMAT'/
      116X,'EQ.2; FIXED FORMAT, AS DESCRIBED'///
-     111X,'BROJ CVOROVA VECI OD 99999 ....................   INPT =',I5/
-     116X,'EQ.0; NE'/
-     116X,'EQ.1; DA'///
+     111X,'Num. NODE GREAT FROM 99999 ....................   INPT =',I5/
+     116X,'EQ.0; NO'/
+     116X,'EQ.1; YES'///
      111X,'BROJ CITANJE POTENCIJALA SA DISKA .......... NXNASTRAN =',I5/
      116X,'EQ.0; NO'/
      116X,'EQ.1; YES'///
      111X,'START PROGRAM PAKP/PAKT ........................ IPAKT =',I5/
      116X,'EQ.0; PAKP'/
      116X,'EQ.1; PAKT'///
-     111X,'STAMPANJE ZAP.SILA/TEMP. U ODREDJEIM CVOR ....IDJERDAP =',I5/
-     116X,'EQ.0; STAMPA U SVIM CVOROVIMA'/
-     116X,'EQ.1; STAMPA U CVOROVIMA IZ FAJLA DJ3D1/DJ3DT1'///)
+     111X,'WRITE FIL.FORCE/TEMP IN NODES FOR LAMELE ....IDJERDAP =',I5/
+     116X,'EQ.0; IN ALL NODES'/
+     116X,'GE.1; ONLY FOR LAMELE'/
+     111X,'WRITE RESULTS IN CROSS SECTION ..............ISPRESEK =',I5/
+     116X,'EQ.0; NO'/
+     116X,'EQ.1; YES'///)
 C
       IF(ISRPS.EQ.0)
 C     *WRITE(IIZLAZ,2001) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,IANIZ
-     *WRITE(IIZLAZ,2001) NPT,NPER,NPRINT,NSTAC,IANIZ
+     *WRITE(IIZLAZ,2001) NPT,NPER,NPRINT,NSTAC,ISNUMER
       IF(ISRPS.EQ.1)
 C     *WRITE(IIZLAZ,6001) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,IANIZ
-     *WRITE(IIZLAZ,2001) NPT,NPER,NPRINT,NSTAC,IANIZ
+     *WRITE(IIZLAZ,2001) NPT,NPER,NPRINT,NSTAC,ISNUMER
  2001 FORMAT(6X,'O S N O V N I    P O D A C I    O    P R O B L E M U'
      1/6X,51('-')///
      111X,'UKUPAN BROJ CVORNIH TACAKA ....................... NP =',I10/
@@ -223,7 +239,7 @@ C     416X,'EQ.1; DINAMIKA'///
      416X,'EQ.0; NESTACIONARNA ANALIZA'/
      416X,'EQ.1; STACIONARNA ANALIZA'/
      416X,'EQ.2; PRVI KORAK STACIONARAN A DRUGI NESTACIONARNI'///
-     411X,'INDIKATOR VDP ANALIZE ........................... IVDP =',I5/
+     411X,'INDIKATOR SLOBODNE NUMERACIJE ................ ISNUMER =',I5/
      416X,'EQ.0; NE'/
      416X,'EQ.1; DA')
  6001 FORMAT(6X,'B A S I C    D A T A    F O R   T H E   P R O B L E M'
@@ -245,7 +261,7 @@ C     416X,'EQ.1; DYNAMIC'///
      416X,'EQ.0; TRANSIENT ANALYSIS'/
      416X,'EQ.1; STATIONARY ANALYSIS'/
      416X,'EQ.2; FIRST STEP-STATIONARY AND OTHER TRANSIENT'///
-     411X,'INDICATOR FOR VDP ANALYSIS ...................... IVDP =',I5/
+     411X,'INDICATOR FOR FREE NUMERATION ................ ISNUMER =',I5/
      416X,'EQ.0; NO'/
      416X,'EQ.1; YES')
 
@@ -335,12 +351,22 @@ C==========================================================================
 
       if (.not.allocated(ID)) allocate(ID(1,NPT),STAT=istat)
       if (.not.allocated(CORD)) allocate(CORD(3,NPT),STAT=istat) 
+      if(ISNUMER.EQ.1) then
+        if (.not.allocated(NCVEL)) allocate(NCVEL(NPT),STAT=istat)
+      endif
 C UCITAVANJE ID(6,*) MATRICE I KOORDINATE CVOROVA-MATRICA CORD(3,*)
 Cxxx
 C      CALL CZINIT
 C      CALL CZPROV(NPT,1,34)
 Cxxx
-      CALL ULAZT1(ID,CORD,NPT,JEDN)
+!       CALL ULAZT1(ID,CORD,NPT,JEDN)
+      CALL ULAZT1(ISNUMER)
+      if(ISNUMER.EQ.1) then
+        NPM=NPA-NPI+1
+        if (.not.allocated(NELCV)) allocate(NELCV(NPM),STAT=istat)
+!         write(*,*) 'NPA,NPI', NPA,NPI
+        CALL VEZACV(NPT)
+      endif
 Cxxx
 C      CALL ZASTIT
 Cxxx
@@ -502,8 +528,23 @@ C==========================================================================
 C UCITAVANJE ELEMENATA I SMESTANJE U MATRICU NEL(9,*)
 !       CALL ICLEAR(NEL,NDIMM*NET)
       if (.not.allocated(NEL)) allocate(NEL(NDIMM,NET),STAT=istat) 
+      if(ISNUMER.EQ.1) then
+        if (.not.allocated(MCVEL)) allocate(MCVEL(NET),STAT=istat)
+      endif
     
-      CALL ULAZR3()
+      CALL ULAZR3(ISNUMER)
+      IF(ISNUMER.EQ.1) THEN
+!       write(*,*) "NMA,NMI", NMA,NMI
+!        write(*,*) " EL(1,2)",NEL(1,2)
+CE    CONNECT NODE NUMBERS FOR FREE NODE NUMERATION
+        CALL VEZACE(NET,NDIM)
+CE      NMA IS MAXIMUM AND NMI IS MINIMUM ELEMENT NUMBERS USED IN FREE
+CE      ELEMENT NUMERATION
+        LLMEL=NMA-NMI+1
+        if (.not.allocated(MELCV)) allocate(MELCV(LLMEL),STAT=istat)
+CE      CONNECT ELEMENT NUMBERS FOR FREE ELEMENT NUMERATION
+        CALL VEZAEL(NET)
+      ENDIF
 Cxxx
 C      CALL CZPROV(NET,1,34)
 Cxxx      
@@ -547,6 +588,10 @@ C==========================================================================
         if (.not.allocated(ZAXISPTCORD)) allocate(ZAXISPTCORD
      1                                  (NUMAXISPTSZ),STAT=istat)
       ENDIF
+      IF(NUMZAD.GT.0) THEN
+       if (.not.allocated(POTZADC)) allocate(POTZADC(NUMZAD),
+     1       STAT=istat) 
+      ENDIF
       CALL ULAZAXIS()
       LNZAD=LMAX
       LNZADJ=LNZAD+3*NUMZAD
@@ -556,7 +601,7 @@ C==========================================================================
       LZADVR=LMAX
       LMAX=LZADVR+NUMZAD*IDVA
       CALL PROMEM(LMAX)
-      CALL ULAZT3(A(LNZAD),A(LZADVR),NUMZAD,ID,A(LNZADJ))
+      CALL ULAZT3(A(LNZAD),A(LZADVR),A(LNZADJ),ISNUMER)
       LICUR=LMAX
       LMAX=LICUR+NUMZAD
 Cxxx
@@ -674,18 +719,18 @@ C
       IF(MAXSIL.GT.0) THEN
        if (.not.allocated(IFLUXR)) allocate(IFLUXR(MAXSIL),STAT=istat) 
       ENDIF
-      CALL ULA3D4(A(LPOVSI),NEL,A(LNGPSI),MAXSIL,NDIM)
+      CALL ULA3D4(A(LPOVSI),A(LNGPSI),MAXSIL,ISNUMER,NET)
       IF(IPAKT.EQ.1) THEN
 C ucitavanje elemenata na kojima je zadata prelaznost
         IF(MAXTQE.GT.0) THEN
           if (.not.allocated(HFACE)) allocate(HFACE(MAXTQE),STAT=istat) 
       if (.not.allocated(NELTOK)) allocate(NELTOK(12,MAXTQE),STAT=istat) 
-          CALL ULA3D4TOK(NEL)
+          CALL ULA3D4TOK(ISNUMER,NET)
         ENDIF
 C ucitavanje elemenata na kojima je zadata radijacija
         IF(MAXER.GT.0) THEN
           if (.not.allocated(NELR)) allocate(NELR(12,MAXER),STAT=istat) 
-          CALL ULA3D4R()
+          CALL ULA3D4R(ISNUMER,NET)
         ENDIF
         IF(INDWATER.EQ.1) THEN
           CALL ISPITA(ACOZ)
@@ -762,7 +807,7 @@ C
        LKOJK=LMAX
        LMAX=LKOJK+NPT
        CALL PROMEM(LMAX)
-       CALL ULKONT(A(LKONT))
+       CALL ULKONT(A(LKONT),ISNUMER,NET)
        CALL ICLEAR(A(LKOJK),NPT)
       ENDIF
 C
@@ -822,14 +867,16 @@ C==========================================================================
       READ(ACOZ,1000) KRAJ
       IF(KRAJ(1:4).NE.'STOP') WRITE(*,*) 'NEMA KRAJA'
       CALL ZATVOR
-      CALL STAMPA(ID,CORD)
+      CALL STAMPA()
       if (.not.allocated(MAXA)) allocate(MAXA(JEDN+1),STAT=istat)
       if (.not.allocated(MHT)) allocate(MHT(JEDN+1),STAT=istat)
 !       LMAXA=LMAX
 !       LMHT=LMAXA+JEDN+1
 !       LMAX=LMHT+JEDN+1
 !       CALL PROMEM(LMAX)
-      CALL MAXATE(MAXA,MHT,ID,NET,NDIM,JEDN,LM2,NWK)
+!        write(*,*) "pre MAXATE"
+      CALL MAXATE(MAXA,MHT,NET,NDIM,JEDN,LM2,NWK)
+!        write(*,*) "posle MAXATE"
       WRITE(IIZLAZ,*)'NWK= ',NWK
 C
 !       CALL DELJIV(LMAX,2,INDL)
@@ -928,72 +975,78 @@ C=======================================================================
       IF (IREST.EQ.1) THEN
         CALL STAZP(A(LNZAD),NASLOV,KKORAK)
       ENDIF
+!        write(*,*) "pre PIJEZ"
 C
       NEPIJ=1
       NEPOR=1
       IPIJEZ=46
-      IF(INDSC.EQ.1.OR.INDSC.EQ.3) THEN
-        IF(IPAKT.EQ.0)THEN
-        OPEN (IPIJEZ,FILE='PIJEZ.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
-     1      ACCESS='SEQUENTIAL')
-        ELSEIF(IPAKT.EQ.1)THEN
-       OPEN (IPIJEZ,FILE='PIJEZT.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
-     1      ACCESS='SEQUENTIAL')
-        ENDIF
-
-          READ(IPIJEZ,1002,err=9999) NPIJ,MAXNP
-          if (npij.gt.0) then
-             IF(MAXNP.GT.20) STOP 'MAXNP.GT.20 - PAKV1.FOR'
-             DO I=1,NPIJ
-                READ(IPIJEZ,1002) NPIJI,MAXNPI
-                IF(NPIJI.GT.100) STOP 'NPIJI.GT.100 - PAKV1.FOR'
-                 NODP(NPIJI)=MAXNPI
-                DO J=1,MAXNPI
-                   IF(INPT.EQ.1)THEN
-                     READ(IPIJEZ,12220) NPIJEZ(J,I)
-                   ELSE
-                     READ(IPIJEZ,1002) NPIJEZ(J,I)
-                   ENDIF
-                ENDDO
-             ENDDO
-          endif
-          GO TO 9994
-          
- 9999     write(*,*) ' NE POSTOJI PIJEZOMETRI '         
-          write(3,*) ' NE POSTOJE PIJEZOMETRI '
-          NEPIJ=0
-12220     FORMAT (I10)     
-C 9997  READ(IPIJEZ,1002,ERR=9996) NPOR
-C      if (npor.gt.0) then
-C         IF(npor.GT.1000) STOP 'npor.GT.1000 - PAKV1.FOR'
-C         DO I=1,npor
-C            READ(IPIJEZ,1002) nporcv(i)
-C         ENDDO
-C      endif
-C      go to 9994
-C 9996 write(*,*) ' NE POSTOJE PORNE CELIJE '         
-C      write(3,*) ' NE POSTOJE PORNE CELIJE '
-C
- 9994     READ(IPIJEZ,1002,ERR=9995) NPORE
-          if (npore.gt.0) then
-             IF(npore.GT.1000) STOP 'npore.GT.1000 - PAKV1.FOR'
-             DO I=1,npore
-                   IF(INPT.EQ.1)THEN
-                    READ(IPIJEZ,13330) nporel(i),(cpor(jj,i),jj=1,3)
-                   ELSE
-                    READ(IPIJEZ,1333) nporel(i),(cpor(jj,i),jj=1,3)
-                   ENDIF
-             ENDDO
-          endif
-          go to 9998
- 9995     write(*,*) ' NE POSTOJE ELEMENTI U KOJIMA SU PORNE CELIJE '  
-          write(3,*) ' NE POSTOJE ELEMENTI U KOJIMA SU PORNE CELIJE '
-          NEPOR=0
-        ENDIF
+!       IF(INDSC.EQ.1.OR.INDSC.EQ.3) THEN
+!         IF(IPAKT.EQ.0)THEN
+!         OPEN (IPIJEZ,FILE='PIJEZ.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
+!      1      ACCESS='SEQUENTIAL')
+!         ELSEIF(IPAKT.EQ.1)THEN
+!        OPEN (IPIJEZ,FILE='PIJEZT.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
+!      1      ACCESS='SEQUENTIAL')
+!         ENDIF
+! 
+!           READ(IPIJEZ,1002,err=9999) NPIJ,MAXNP
+!           if (npij.gt.0) then
+!              IF(MAXNP.GT.20) STOP 'MAXNP.GT.20 - PAKV1.FOR'
+!              DO I=1,NPIJ
+!                 READ(IPIJEZ,1002) NPIJI,MAXNPI
+!                 IF(NPIJI.GT.100) STOP 'NPIJI.GT.100 - PAKV1.FOR'
+!                  NODP(NPIJI)=MAXNPI
+!                 DO J=1,MAXNPI
+!                    IF(INPT.EQ.1)THEN
+!                      READ(IPIJEZ,12220) NPIJEZ(J,I)
+!                    ELSE
+!                      READ(IPIJEZ,1002) NPIJEZ(J,I)
+!                    ENDIF
+!                 ENDDO
+!              ENDDO
+!           endif
+!           GO TO 9994
+!           
+!  9999     write(*,*) ' NE POSTOJI PIJEZOMETRI '         
+!           write(3,*) ' NE POSTOJE PIJEZOMETRI '
+!           NEPIJ=0
+! 12220     FORMAT (I10)     
+! C 9997  READ(IPIJEZ,1002,ERR=9996) NPOR
+! C      if (npor.gt.0) then
+! C         IF(npor.GT.1000) STOP 'npor.GT.1000 - PAKV1.FOR'
+! C         DO I=1,npor
+! C            READ(IPIJEZ,1002) nporcv(i)
+! C         ENDDO
+! C      endif
+! C      go to 9994
+! C 9996 write(*,*) ' NE POSTOJE PORNE CELIJE '         
+! C      write(3,*) ' NE POSTOJE PORNE CELIJE '
+! C
+!  9994     READ(IPIJEZ,1002,ERR=9995) NPORE
+!           if (npore.gt.0) then
+!              IF(npore.GT.1000) STOP 'npore.GT.1000 - PAKV1.FOR'
+!              DO I=1,npore
+!                    IF(INPT.EQ.1)THEN
+!                     READ(IPIJEZ,13330) nporel(i),(cpor(jj,i),jj=1,3)
+!                    ELSE
+!                     READ(IPIJEZ,1333) nporel(i),(cpor(jj,i),jj=1,3)
+!                    ENDIF
+!              ENDDO
+!           endif
+!           go to 9998
+!  9995     write(*,*) ' NE POSTOJE ELEMENTI U KOJIMA SU PORNE CELIJE '  
+!           write(3,*) ' NE POSTOJE ELEMENTI U KOJIMA SU PORNE CELIJE '
+!           NEPOR=0
+!         ENDIF
         IF(INDSC.EQ.2.OR.INDSC.EQ.4) THEN
         IF(IPAKT.EQ.0)THEN
         OPEN (IPIJEZ,FILE='PIJEZ.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
+          IZPOD1=51
+          IMECSV='pijeznivoPAK.CSV'
+          OPEN (IZPOD1,FILE=IMECSV,STATUS='UNKNOWN',
+     1      FORM='FORMATTED',ACCESS='SEQUENTIAL')
+     
         ELSEIF(IPAKT.EQ.1)THEN
        OPEN (IPIJEZ,FILE='PIJEZT.DAT',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
@@ -1016,6 +1069,15 @@ C
 !   promenjen format za Grancarevo za nazive termometra na A15
 !                 READ(IPIJEZ,358) MPOINT_ID(I),MP_ELEMENT(I),
      1                              (MP_COORDS(jj,I),jj=1,6)
+               IF(ISNUMER.EQ.1) THEN
+                 NNMP=MP_ELEMENT(I)
+                 JJ=NNMP-NMI+1
+             IF(NNMP.LT.NMI.OR.NNMP.GT.NMA.OR.MELCV(JJ).EQ.0) THEN
+             write(*,*) 'pijez', MPOINT_ID(I),I,NNMP,'van modela'
+             STOP 
+             ENDIF
+                 MP_ELEMENT(I)=MELCV(JJ)
+               ENDIF
              ENDDO
           endif
 C dodato citanje tacaka u kojima se stampaju vrednosti za prikaz rezultata
@@ -1031,12 +1093,26 @@ C dodato citanje tacaka u kojima se stampaju vrednosti za prikaz rezultata
              if (.not.allocated(DP_RESULTS)) allocate(DP_RESULTS
      1                         (BRKORAKA,2,MAX_DPOINTS+1),STAT=istat)
              DO I=1,MAX_DPOINTS
-                READ(IPIJEZ,357) DPOINT_ID(I),DP_ELEMENT(I),
+                READ(IPIJEZ,358) DPOINT_ID(I),DP_ELEMENT(I),
      1                             (DP_COORDS(jj,I),jj=1,6)
+!             write(3,*)"dpoint",DPOINT_ID(I),DP_ELEMENT(I)
+               IF(ISNUMER.EQ.1) THEN
+                 NNMP=DP_ELEMENT(I)
+                 JJ=NNMP-NMI+1
+             IF(NNMP.LT.NMI.OR.NNMP.GT.NMA.OR.MELCV(JJ).EQ.0) THEN
+             write(*,*) 'tacka', DPOINT_ID(I),I,NNMP,'van modela'
+             STOP 
+             ENDIF
+                 DP_ELEMENT(I)=MELCV(JJ)
+               ENDIF
              ENDDO
           IZPOD=50
-          CSVEXT='.CSV'
-          IMECSV=trim(IME) // CSVEXT
+          IB=INDEX(IME,'.')
+          IF (IB.EQ.0) THEN
+           IMECSV=trim(IME) // '.CSV'
+          ELSE
+           IMECSV=IME(1:IB-1)//'.CSV'
+          ENDIF
           OPEN (IZPOD,FILE=IMECSV,STATUS='UNKNOWN',
      1      FORM='FORMATTED',ACCESS='SEQUENTIAL')
           endif
@@ -1045,35 +1121,251 @@ C dodato citanje tacaka u kojima se stampaju vrednosti za prikaz rezultata
 C KRAJ DELA ZA UCITAVANJE PODATAKA IZ PIJEZO.DAT
 C
  9998 IZNEU=49
-!       IF(IPAKT.EQ.0) THEN
+       IF(IPAKT.EQ.0) THEN
        IZPRO=48
       OPEN (IZPRO,FILE='PROT.NEU',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
-!       ENDIF
+       CALL TGRMAT(A(LKONST),NUMMAT,NETIP,IZPRO,NDIM,NASLOV,GAMA)
+        CALL TGRAUK(NPT,IZPRO,ISNUMER)      
+        IF(NETIP.EQ.3.AND.NKONT.GT.0) 
+     *  CALL TGRAU3K(A(LKONT),NDIM,IZPRO)
+       ENDIF
        IZPOT=47
       OPEN (IZPOT,FILE='POT.TXT',STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
-CN       IF (INDSC.EQ.0) THEN
+       IF (INDSC.EQ.0.OR.INDSC.EQ.3.OR.INDSC.EQ.4) THEN
          CALL TGRMAT(A(LKONST),NUMMAT,NETIP,IZNEU,NDIM,NASLOV,GAMA)
-         CALL TGRAUK(CORD,ID,NPT,IZNEU)
+         CALL TGRAUK(NPT,IZNEU,ISNUMER)
 !          IF (NETIP.EQ.2) CALL TGRAU2(NEL,NDIM,NET,IZNEU)
-         CALL TGRAU3(NDIM,NET,IZNEU)
-CN      ENDIF
-      CALL TGRMAT(A(LKONST),NUMMAT,NETIP,IZPRO,NDIM,NASLOV,GAMA)
-      CALL TGRAUK(CORD,ID,NPT,IZPRO)      
+         CALL TGRAU3(NDIM,NET,IZNEU,ISNUMER)
+      ENDIF
 C      IF (NETIP.EQ.2) CALL TGRAU2(NEL,NDIM,NET,IZNEU)
 C      IF (NETIP.EQ.3) CALL TGRAU3(NEL,NDIM,NET,IZNEU)
-      IF(NETIP.EQ.3.AND.NKONT.GT.0) 
-     *CALL TGRAU3K(A(LKONT),NDIM,IZPRO)
 C
 CN      IF (INDSC.EQ.0)THEN
 !       IF(IPAKT.EQ.0) THEN
-       CALL NEUTRA(A(LVREME),NPER,NASLOV,1,48)
+       IF(IPAKT.EQ.0)  CALL NEUTRA(A(LVREME),NPER,NASLOV,1,48)
 !       ENDIF
         CALL NEUTRA(A(LVREME),NPER,NASLOV,1,49)
-        IF(NKONT.GT.0) CALL TGRMATK(A(LKONT),NEL,A(LKONST),NDIM)
-        CALL TGRMATS(NEL,A(LKONST),NDIM,NET)
+!  stampanje koeficijenta filtracije u neu fajl        
+        IF((NKONT.GT.0).AND.(INDSC.EQ.0.OR.INDSC.EQ.3.OR.INDSC.EQ.4))
+     1        CALL TGRMATK(A(LKONT),A(LKONST),NDIM,ISNUMER)
+        IF (INDSC.EQ.0.OR.INDSC.EQ.3.OR.INDSC.EQ.4) 
+     1       CALL TGRMATS(A(LKONST),NDIM,NET,ISNUMER)
 CN      ENDIF
+!  kada ima preseka 
+      IF(ISPRESEK.GT.0) THEN
+! ucitavanje preseka (svi preseci za lamelu su u jednom fajlu)      
+        CALL READPRESEK (ISNUMER)
+! otvaranje neu fajlova za stampanje rezultata za preseke
+        DO IPR=1,IPRES
+          IFILE=300
+          IFILE=IFILE+IPR
+       SELECT CASE (IPR)
+       CASE (1)
+       IF ((IDJERDAP.GE.10).AND.(IDJERDAP.LE.14)) THEN
+          write(IMECSV2,21) IDJERDAP
+          IMEPR='L' // IMECSV2 // '-O-F.NEU'    
+       if(IPAKT.EQ.1)IMEPR='L' // IMECSV2 // '-O-T.NEU'
+        ELSEIF ((IDJERDAP.LT.10))THEN
+          write(IMECSV1,20) IDJERDAP
+          IMEPR='L' // IMECSV1 // '-O-F.NEU'    
+       if(IPAKT.EQ.1)IMEPR='L' // IMECSV1 // '-O-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.15))THEN
+          IMEPR='SIII-A6-F.NEU'    
+          if(IPAKT.EQ.1)IMEPR='SIII-A6-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.16))THEN
+          IMEPR='SII-A4-F.NEU'    
+        if(IPAKT.EQ.1)IMEPR='SII-A4-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.17))THEN
+          IMEPR='SI-A2-F.NEU'    
+        if(IPAKT.EQ.1)IMEPR='SI-A2-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.18))THEN
+          IMEPR='MB-O-F.NEU'    
+        if(IPAKT.EQ.1)IMEPR='MB-O-T.NEU'
+        ENDIF
+       CASE (2)
+       IF ((IDJERDAP.GE.10).AND.(IDJERDAP.LE.14)) THEN
+          write(IMECSV2,21) IDJERDAP
+          IMEPR='L' // IMECSV2 // '-OB-F.NEU'    
+       if(IPAKT.EQ.1)IMEPR='L' // IMECSV2 // '-OB-T.NEU'
+        ELSEIF ((IDJERDAP.LT.10))THEN
+          write(IMECSV1,20) IDJERDAP
+          IMEPR='L' // IMECSV1 // '-OB-F.NEU'    
+       if(IPAKT.EQ.1)IMEPR='L' // IMECSV1 // '-OB-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.15))THEN
+          IMEPR='SIII-A5-F.NEU'    
+          if(IPAKT.EQ.1)IMEPR='SIII-A5-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.16))THEN
+          IMEPR='SII-A3-F.NEU'    
+        if(IPAKT.EQ.1)IMEPR='SII-A3-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.17))THEN
+          IMEPR='SI-A1-F.NEU'    
+        if(IPAKT.EQ.1)IMEPR='SI-A1-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.18))THEN
+          IMEPR='MB-OA-F.NEU'    
+         if(IPAKT.EQ.1)IMEPR='MB-OA-T.NEU'
+        ENDIF
+       CASE (3)
+        IF ((IDJERDAP.EQ.15))THEN
+          IMEPR='SIII-OA-F.NEU'    
+          if(IPAKT.EQ.1)IMEPR='SIII-OA-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.16))THEN
+          IMEPR='SII-OA-F.NEU'    
+        if(IPAKT.EQ.1)IMEPR='SII-OA-T.NEU'
+        ELSEIF ((IDJERDAP.EQ.17))THEN
+          IMEPR='SI-OA-F.NEU'    
+        if(IPAKT.EQ.1)IMEPR='SI-OA-T.NEU'
+         ELSEIF ((IDJERDAP.EQ.18))THEN
+           IMEPR='MB-CS-F.NEU'    
+         if(IPAKT.EQ.1)IMEPR='MB-CS-T.NEU'
+       ENDIF
+       CASE (4)
+         IF ((IDJERDAP.EQ.15))THEN
+           IMEPR='SIII-O-F.NEU'    
+           if(IPAKT.EQ.1)IMEPR='SIII-O-T.NEU'
+         ELSEIF ((IDJERDAP.EQ.16))THEN
+           IMEPR='SII-O-F.NEU'    
+         if(IPAKT.EQ.1)IMEPR='SII-O-T.NEU'
+         ELSEIF ((IDJERDAP.EQ.17))THEN
+           IMEPR='SI-O-F.NEU'    
+         if(IPAKT.EQ.1)IMEPR='SI-O-T.NEU'
+         ELSEIF ((IDJERDAP.EQ.18))THEN
+           IMEPR='MB-O-F.NEU'    
+         if(IPAKT.EQ.1)IMEPR='MB-O-T.NEU'
+        ENDIF
+      CASE DEFAULT
+      END SELECT
+!          write(*,*),"IFILE,IME ",IFILE,IMEPR
+        OPEN (IFILE,FILE=IMEPR,STATUS='UNKNOWN',
+     1      FORM='FORMATTED',ACCESS='SEQUENTIAL')
+!          write(*,*) "stampanje materijala preseka"
+        CALL TGRMATP(A(LKONST),NUMMAT,IFILE,NASLOV,
+     1        GAMA,10)
+!  za presek       
+!          write(*,*) "stampanje cvorova preseka"
+        CALL TGRAUKP(IFILE,IPR)
+!          write(*,*) "stampanje elemenata preseka"
+        CALL TGRAU3P(IFILE,IPR)
+!          write(*,*) "stampanje perioda"
+        CALL NEUTRA(A(LVREME),NPER,NASLOV,1,IFILE)
+        ENDDO
+      ELSEIF(ISPRESEK.EQ.-1)THEN
+        CALL READPRESEKALL (ISNUMER)
+! otvaranje neu fajlova za stampanje rezultata za preseke
+        DO IPR=1,IPRES
+         IFILE=300
+         IFILE=IFILE+IPR
+       SELECT CASE (IPR)
+       CASE (1)
+          IMEPR='L1-O-F.NEU'    
+       CASE (2)
+          IMEPR='L1-OB-F.NEU'    
+       CASE (3)
+          IMEPR='L2-O-F.NEU'    
+       CASE (4)
+          IMEPR='L2-OB-F.NEU'    
+       CASE (5)
+          IMEPR='L3-O-F.NEU'    
+       CASE (6)
+          IMEPR='L3-OB-F.NEU'    
+       CASE (7)
+          IMEPR='L4-O-F.NEU'    
+       CASE (8)
+          IMEPR='L4-OB-F.NEU'    
+       CASE (9)
+          IMEPR='L5-O-F.NEU'    
+       CASE (10)
+          IMEPR='L5-OB-F.NEU'    
+       CASE (11)
+          IMEPR='L6-O-F.NEU'    
+       CASE (12)
+          IMEPR='L6-OB-F.NEU'    
+       CASE (13)
+          IMEPR='L7-O-F.NEU'    
+       CASE (14)
+          IMEPR='L7-OB-F.NEU'    
+       CASE (15)
+          IMEPR='L8-O-F.NEU'    
+       CASE (16)
+          IMEPR='L8-OB-F.NEU'    
+       CASE (17)
+          IMEPR='L9-O-F.NEU'    
+       CASE (18)
+          IMEPR='L9-OB-F.NEU'    
+       CASE (19)
+          IMEPR='L10-O-F.NEU'    
+       CASE (20)
+          IMEPR='L10-OB-F.NEU'    
+       CASE (21)
+          IMEPR='L11-O-F.NEU'    
+       CASE (22)
+          IMEPR='L11-OB-F.NEU'    
+       CASE (23)
+          IMEPR='L12-O-F.NEU'    
+       CASE (24)
+          IMEPR='L12-OB-F.NEU'    
+       CASE (25)
+          IMEPR='L13-O-F.NEU'    
+       CASE (26)
+          IMEPR='L13-OB-F.NEU'    
+       CASE (27)
+          IMEPR='L14-O-F.NEU'    
+       CASE (28)
+          IMEPR='L14-OB-F.NEU'    
+       CASE (29)
+          IMEPR='PB-OB-F.NEU'    
+       CASE (30)
+          IMEPR='EL-OA-F.NEU'    
+       CASE (31)
+          IMEPR='SIII-A6-F.NEU'    
+       CASE (32)
+          IMEPR='SIII-A5-F.NEU'    
+       CASE (33)
+          IMEPR='SIII-OA-F.NEU'    
+       CASE (34)
+          IMEPR='SII-A4-F.NEU'    
+       CASE (35)
+          IMEPR='SII-A3-F.NEU'    
+       CASE (36)
+          IMEPR='SII-OA-F.NEU'    
+       CASE (37)
+          IMEPR='SII-O-F.NEU'    
+       CASE (38)
+          IMEPR='SI-A2-F.NEU'    
+       CASE (39)
+          IMEPR='SI-A1-F.NEU'    
+       CASE (40)
+          IMEPR='SI-OA-F.NEU'    
+       CASE (41)
+          IMEPR='MB-O-F.NEU'    
+       CASE (42)
+          IMEPR='MB-OA-F.NEU'    
+       CASE (43)
+          IMEPR='MB-CS-F.NEU'    
+       CASE (44)
+          IMEPR='SI-O-F.NEU'    
+       CASE (45)
+          IMEPR='SIII-O-F.NEU'    
+      CASE DEFAULT
+      END SELECT
+!          write(*,*),"IFILE,IME ",IFILE,IMEPR
+        OPEN (IFILE,FILE=IMEPR,STATUS='UNKNOWN',
+     1      FORM='FORMATTED',ACCESS='SEQUENTIAL')
+!          write(*,*) "stampanje materijala preseka"
+        CALL TGRMATP(A(LKONST),NUMMAT,IFILE,NASLOV,
+     1        GAMA,10)
+!  za presek       
+!          write(*,*) "stampanje cvorova preseka"
+        CALL TGRAUKP(IFILE,IPR)
+!          write(*,*) "stampanje elemenata preseka"
+        CALL TGRAU3P(IFILE,IPR)
+!          write(*,*) "stampanje perioda"
+        CALL NEUTRA(A(LVREME),NPER,NASLOV,1,IFILE)
+        ENDDO
+      ENDIF
+   20  format (I1)
+   21  format (I2)
 C
       IF (IREST.EQ.1) THEN 
       IF(ISRPS.EQ.0)
@@ -1096,6 +1388,7 @@ C
 
           CALL DATE_AND_TIME(VALUES=Dtime)
           WRITE(*,*) 'vreme pre poziva racun3d', (Dtime(i),i=5,7)
+          WRITE(3,*) 'vreme pre poziva racun3d', (Dtime(i),i=5,7)
 
       NJUTN=0
       IF (NJUTN.NE.0) THEN
@@ -1115,7 +1408,7 @@ C     1LCORD,LSKEF,LSKEFN,LKONT,LDEFOR,LVREME,LVRFUN,LTT10,LUBRZ,LUBRZ0,
 C     1LAK,LVECTJ,LIVECT,LPOVSI,LPOMER,LITFMA,LKONST,NASLOV,LICUR
 C     1,LVG,LGG,LKOJK
  1234 CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
-!       CALL MPI_BCAST(NETIP,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+       CALL MPI_BCAST(IPAKT,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
 !       IF (NETIP.EQ.2) THEN
 !       CALL RACUN(TT1,SILE,NEL,
 !      1ID,A(LNZAD),A(LZADVR),A(LNGPSI),MAXA,CORD,SKEF,
@@ -1124,64 +1417,90 @@ C     1,LVG,LGG,LKOJK
 !      1A(LPOVSI),POMER,A(LITFMA),A(LKONST),NASLOV,
 !      1A(LICUR),VG,GG,A(LKOJK))
 !       ELSE
+        write(*,*) "pre RACN3D"
       IF(IPAKT.EQ.0) THEN
       CALL RACN3D(TT1,SILE,
-     1ID,A(LNZAD),A(LZADVR),A(LNGPSI),MAXA,CORD,SKEF,
+     1A(LNZAD),A(LZADVR),A(LNGPSI),MAXA,SKEF,
      1SKEFN,A(LKONT),DEFOR,A(LVREME),A(LVRFUN),TT10,
      1UBRZ,UBRZ0,AK,VECTJ,IVECT,
      1A(LPOVSI),POMER,A(LITFMA),A(LKONST),NASLOV,
-     1A(LICUR),VG,GG,A(LKOJK))
+     1A(LICUR),VG,GG,A(LKOJK),ISNUMER)
       ELSEIF(IPAKT.EQ.1) THEN
       CALL RACN3DT(TT1,SILE,
-     1ID,A(LNZAD),A(LZADVR),A(LNGPSI),MAXA,CORD,SKEF,
+     1A(LNZAD),A(LZADVR),A(LNGPSI),MAXA,SKEF,
      1SKEFN,DEFOR,A(LVREME),A(LVRFUN),TT10,
      1UBRZ,UBRZ0,AK,VECTJ,IVECT,
      1A(LPOVSI),POMER,A(LITFMA),A(LKONST),NASLOV,
-     1A(LICUR),VG,GG,INDPT)
+     1A(LICUR),VG,GG,INDPT,ISNUMER)
       ENDIF
+      IF (myid.ne.0) goto 1345
 !          WRITE(*,*) "isave",isave
+!  stampa za pakt temperature u tab fajlove
+      IF(IPAKT.EQ.1)THEN
       DO IMP=1,MAX_MPOINTS
         INDMPI=0
         DO JMP=1,15
             IF(lge(MPOINT_ID(IMP)(JMP:JMP),'-').and.lle(MPOINT_ID(IMP)
      1                                          (JMP:JMP),'z')) then
                 INDMPI=INDMPI+1
-       ENDIF
+            ENDIF
         ENDDO
 !         WRITE(*,*) "INDMPI",INDMPI
 !         WRITE(*,*) "MPOINT_ID(",IMP,")",MPOINT_ID(IMP)
 !top WINDOWS START      
-         if (.not.allocated(MP_RESULTS_NIZ)) allocate(MP_RESULTS_NIZ
+          if (.not.allocated(MP_RESULTS_NIZ)) allocate(MP_RESULTS_NIZ
      1                               (BRKORAKA),STAT=istat)
-      do i=1,BRKORAKA
-            MP_RESULTS_NIZ(i) = MP_RESULTS(i,IMP+1)
-          enddo    
-                CALL save_series(MPOINT_ID(IMP),MP_VREME,
+       do i=1,BRKORAKA
+             MP_RESULTS_NIZ(i) = MP_RESULTS(i,IMP+1)
+           enddo    
+                 CALL save_series(MPOINT_ID(IMP),MP_VREME,
      1             MP_RESULTS_NIZ,BRKORAKA,MAX_MPOINTS,IMP,INDMPI,isave)
-       if (allocated(MP_RESULTS_NIZ)) deallocate(MP_RESULTS_NIZ)
+        if (allocated(MP_RESULTS_NIZ)) deallocate(MP_RESULTS_NIZ)
 C      zile asus linux
 !top WINDOWS END       
-        
 !busarac LINUX START      
+c          write(*,*) "pakv1-posle raun"
+c             write(*,*) BRKORAKA
+c          do ii=1,BRKORAKA
+c             write(*,*) "MP_RESULTS",ii,MP_RESULTS(II,IMP+1)
+c          enddo
 !        CALL save_series(MPOINT_ID(IMP),MP_VREME,
 !     1             MP_RESULTS,BRKORAKA,MAX_MPOINTS,IMP,INDMPI,isave)
 !busarac LINUX END     
       ENDDO
-      IF (myid.ne.0) goto 1345
+      ENDIF
+        write(*,*) "posle RACN3D"
+!  kada ima preseka yatvaranje neu fajla
+      IF((ISPRESEK.GT.0).OR.(ISPRESEK.EQ.-1)) THEN
+        DO IPR=1,IPRES
+          IFILE=300
+          IFILE=IFILE+IPR
+          CALL NEUTRA(VREME,NPER,NASLOV,2,IFILE)
+        ENDDO
+      ENDIF
+!      
       IF (INDSC.NE.2) THEN
-         CALL NEUTRA(A(LVREME),NPER,NASLOV,2,48)
+      IF(IPAKT.EQ.0) CALL NEUTRA(A(LVREME),NPER,NASLOV,2,48)
          CALL NEUTRA(A(LVREME),NPER,NASLOV,2,49)
       ENDIF
 C==========================================================================
 C     ZAPISIVANJE TEMPERATURA KOJE CE BITI POCETNE
       IF(INDPT.EQ.-1) THEN
-         OPEN (99,FILE='ZIPOCT.IZ',STATUS='UNKNOWN',FORM='UNFORMATTED',
+         IB=INDEX(IME,'.')
+          IF (IB.EQ.0) THEN
+           IZIPOCT=trim(IME) // '.UL'
+          ELSE
+           IZIPOCT=IME(1:IB-1)//'.UL'
+          ENDIF
+      
+         OPEN (99,FILE=IZIPOCT,STATUS='UNKNOWN',FORM='UNFORMATTED',
      1         ACCESS='SEQUENTIAL')
          CALL POCETNET(TT1,NPT,99,0)
             CLOSE (99)
       ENDIF
       CALL DATE_AND_TIME(VALUES=Dtime)
       WRITE(*,*) 'vreme na kraju', (Dtime(i),i=5,7)
+      WRITE(3,*) 'vreme na kraju', (Dtime(i),i=5,7)
 C==========================================================================
       IF(ISRPS.EQ.0)
      *WRITE(IIZLAZ,2500)
@@ -1198,17 +1517,19 @@ C==========================================================================
 !          WRITE(*,*) 'kraj proracuna', (Dtime(i),i=5,7)
 
       WRITE(*,*)'END OF CALCULATION'
- 1345 CALL MPI_FINALIZE(IERR)
+ 1345 CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+      CALL MPI_FINALIZE(IERR)
       STOP
       END
 C=======================================================================
-      SUBROUTINE STAMPA(ID,CORD)
+      SUBROUTINE STAMPA()
+      USE NODES
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /NUMNPT/ NUMZAD,NPT,NDIM,MAXSIL,JEDN,NWK,NET
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /PRIKAZ/ INDSC,IZPOT
       COMMON /DODAT/ NDIMM
-      DIMENSION ID(1,*),CORD(3,*)
+!       DIMENSION ID(1,*),CORD(3,*)
       
       IF (INDSC.EQ.2) RETURN
       IF(ISRPS.EQ.0)
@@ -1221,7 +1542,8 @@ C=======================================================================
      111X,'GENERATED DATA ABOUT NODES, EQUATIONS AND COORDINATES'/)
       IF (INDSC.EQ.0)THEN
        DO 12 I=1,NPT
-        WRITE(IIZLAZ,1005) I,(ID(II,I),II=1,1),(CORD(J,I),J=1,3)
+!         WRITE(IIZLAZ,1005) I,(ID(II,I),II=1,1),(CORD(J,I),J=1,3)
+        WRITE(IIZLAZ,1005) I,(ID(1,I)),(CORD(J,I),J=1,3)
    12  CONTINUE
       ENDIF
  1005 FORMAT(I20,2X,I10,3X,3(F10.4,2X))
@@ -1230,37 +1552,53 @@ C=======================================================================
 C==========================================================================
 C zapisivanje temperature u fajl *.ZT (ZITEMP)
 C=======================================================================
-      SUBROUTINE RESTEL(VREME,TEMP,NP,IDJSTAMP1,NP3D1)
+!       SUBROUTINE RESTEL(VREME,TEMP,NP,IDJSTAMP1,NP3D1,ISNUMER,KKORAK)
+      SUBROUTINE RESTEL(VREME,TEMP,NP,ISNUMER,KKORAK)
+      USE NODES
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
-      COMMON /DJERDAP/ IDJERDAP
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
       COMMON /ICITANJE/ INPT
-      DIMENSION TEMP(*),IDJSTAMP1(5,*),NP3D1(5)
+      DIMENSION TEMP(*)
+!       ,IDJSTAMP1(1,*),NP3D1(5)
 C
-           IF(IDJERDAP.EQ.1) THEN
-             IFILE=105
-             DO IK=1,1
-               IFILE=IFILE+1
-               WRITE(IFILE,5017) NP3D1(IK)
+!            IF(IDJERDAP.EQ.1) THEN
+!  kad je IDJERDAP > 0 zapisuje temperature za cvorove iz fajla DJ1 ...
+          IFILE=105
+          IFILE=IFILE+IDJERDAP+KKORAK
+!            IF(IDJERDAP.GE.1) THEN
+!              DO IK=1,1
+!                IFILE=IFILE+IDJERDAP
+!                WRITE(IFILE,5017) NP3D1(IK)
+               WRITE(IFILE,5017) NP
                DO NN=1,NP
-               IF(IDJSTAMP1(IK,NN).EQ.IK) THEN
+!  provera da li se za cvor NN pisu temperature               
+!                IF(IDJSTAMP1(IK,NN).EQ.IK) THEN
 !                   IF(INPT.EQ.1) THEN
-                WRITE(IFILE,5017) NN,TEMP(NN)
+                IF(ISNUMER.EQ.0)THEN
+                 WRITE(IFILE,5017) NN,TEMP(NN)
+                ELSE
+                 WRITE(IFILE,5017) NCVEL(NN),TEMP(NN)
+                ENDIF
 !                   ELSE
 !                 WRITE(IFILE,5007) NN,TEMP(NN)
 !                   ENDIF
-               ENDIF 
+!                ENDIF 
               ENDDO
-             ENDDO
-           ELSE
-             WRITE(19,5017) NP
-             DO NN=1,NP
-!                IF(INPT.EQ.1) THEN
-                WRITE(19,5017) NN,TEMP(NN)
-!                ELSE
-!                 WRITE(19,5007) NN,TEMP(NN)
-!                ENDIF
-             ENDDO
-           ENDIF
+!              ENDDO
+!            ELSE
+!              WRITE(19,5017) NP
+!              DO NN=1,NP
+! !                IF(INPT.EQ.1) THEN
+!                 IF(ISNUMER.EQ.0)THEN
+!                  WRITE(19,5017) NN,TEMP(NN)
+!                 ELSE
+!                  WRITE(19,5017) NCVEL(NN),TEMP(NN)
+!                 ENDIF
+! !                ELSE
+! !                 WRITE(19,5007) NN,TEMP(NN)
+! !                ENDIF
+!              ENDDO
+!            ENDIF
 !       IF(IDJERDAP.EQ.1) WRITE(II,5017) NP3D1
 !          DO NN=1,NP
 !           IF(IDJERDAP.EQ.1) THEN

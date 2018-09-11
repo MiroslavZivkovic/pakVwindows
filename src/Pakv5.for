@@ -3,6 +3,7 @@ C==========================================================================
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /PROMEN/ NJUTN,INDOPT,INDPRO
+      COMMON /PRIKAZ/ INDSC,IZPOT
       CHARACTER*250 ACOZ
       DIMENSION AK(3,5,*),INDPK(*)
 
@@ -28,8 +29,10 @@ C==========================================================================
        AK(3,4,I)=AK(1,4,I)
        AK(3,5,I)=AK(1,5,I)
        IF(IPAKT.EQ.1) AK(3,5,I)=AK(2,1,I)
+        IF(INDSC.EQ.2.OR.INDSC.EQ.1) go to 20
        WRITE(IIZLAZ,1016)I,AK(1,1,I),I,AK(1,2,I),I,AK(1,3,I),I,AK(1,4,I)
      1 ,I,AK(2,1,I),I,AK(2,2,I),I,AK(2,3,I),I,AK(2,4,I),I,AK(1,5,I)
+  20    CONTINUE
       ENDDO
       RETURN
 
@@ -128,19 +131,22 @@ C
  1017 FORMAT(I20,3I10,2F10.3)
       END
 C==========================================================================
-      SUBROUTINE ULA3D4(POVSIL,NEL,NGPSIL,MAXSIL,NDIM)
+      SUBROUTINE ULA3D4(POVSIL,NGPSIL,MAXSIL,ISNUMER,NET)
+      USE NODES
+      USE ELEMENTS
       USE PREDISCRIBED
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /DODAT/ NDIMM 
       COMMON /ICITANJE/INPT
+      COMMON /PRIKAZ/ INDSC,IZPOT
       CHARACTER*250 ACOZ
       
       DIMENSION POVSIL(4,*)
-      DIMENSION NGPSIL(12,*),NEL(NDIMM,*)
+      DIMENSION NGPSIL(12,*)
       INTEGER*8 NGPSIL
-      
+!       write(*,*) "MAXSIL",MAXSIL
       DO 60 I=1,MAXSIL
       CALL ISPITA(ACOZ)
       IF(INPT.EQ.1) THEN      
@@ -154,16 +160,50 @@ C==========================================================================
      2 NGPSIL(10,I),POVSIL(1,I),POVSIL(2,I),POVSIL(3,I),POVSIL(4,I),
      3 IFLUXR(I)
       ENDIF
-
-  60   CONTINUE
-
+      IF(ISNUMER.EQ.1)THEN
+         NN=NGPSIL(1,I)
+         N=NN-NMI+1
+         NI=MELCV(N)
+         IF(NI.EQ.0.OR.NN.LT.NMI.OR.NN.GT.NMA) THEN
+           IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2101) NN, I
+           IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6101) NN, I
+            STOP ' PROGRAM STOP - PAKV5 3 - ULA3D4'
+          ENDIF
+          NGPSIL(1,I)=NI
+         DO IJK=2,9
+           NN=NGPSIL(IJK,I)
+           N=NN-NPI+1
+           if(NN.EQ.0) then
+             NI=NN
+             goto 59
+           ENDIF
+           NI=NELCV(N)
+!         write(*,*) "NN,NI,I,NPI,NPA",NN,NI,I,NPI,NPA
+           IF(NN.LT.NPI.OR.NN.GT.NPA) THEN
+             IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN,I
+             IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN,I
+             STOP ' PROGRAM STOP - PAKV5 -3a ULA3D4'
+           ENDIF
+  59       NGPSIL(IJK,I)=NI
+         ENDDO
+      ENDIF
+  60  CONTINUE
+ 1012 FORMAT(I5)
+ 1022 FORMAT(I10)
  1015 FORMAT(10I5,4F10.3,I5)
+!  1015 FORMAT(5X,9I5,4F10.3,I5)
  1025 FORMAT(10I10,4F10.3,I10)
+!  1025 FORMAT(10X,9I10,4F10.3,I10)
       WRITE(IIZLAZ,1103)
  1103 FORMAT(///
      11X,'ZADAVANJE GRANICNIH USLOVA - POVRSINSKE SILE'//
      11X,'ELEMENT,CVOR1,CVOR2,CVOR3,CVOR4,BROJ VREMENSKE FUNKCIJE,FS1,FS
      12,FS3,FS4'/)
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
       DO 72 I=1,MAXSIL
       IF(INPT.EQ.1) THEN      
       WRITE(IIZLAZ,1017) NGPSIL(1,I),NGPSIL(2,I),NGPSIL(3,I),
@@ -179,9 +219,19 @@ C==========================================================================
   72  CONTINUE
  1016 FORMAT(I10,9I5,4F10.3,I5)
  1017 FORMAT(I10,9I10,4F10.3,I5)
+ 2101 FORMAT(//' GRESKA U UCITAVANJU ZADATIH POT/TEMP'/
+     1' ELEM',I10,' NE POSTOJI',I10 /' PROGRAM STOP - PAKV5 - ULA3D4'//)
+ 2100 FORMAT(//' GRESKA U UCITAVANJU ZADATIH POT/TEMP'/
+     1' CVOR',I10,' NE POSTOJI',I10 /' PROGRAM STOP - PAKV5 - ULA3D4'//)
+ 6100 FORMAT(//' ERROR IN INPUT DATA ABOUT PRESCRIBE POT/TEM'/
+     1' NODE',I10,' NOT EXIST'I10 /' PROGRAM STOP - PAKV5 - ULA3D4'//)
+ 6101 FORMAT(//' ERROR IN INPUT DATA ABOUT PRESCRIBE POT/TEM'/
+     1' ELEM',I10,' NOT EXIST'I10 /' PROGRAM STOP - PAKV5 - ULA3D4'//)
       END
 C==========================================================================
-      SUBROUTINE ULA3D4TOK(NEL)
+      SUBROUTINE ULA3D4TOK(ISNUMER,NET)
+      USE NODES
+      USE ELEMENTS
       USE PREDISCRIBED
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 
@@ -193,24 +243,66 @@ C==========================================================================
       COMMON /DODAT/ NDIMM
 
 !       DIMENSION POVSIL(4,*)
-      DIMENSION NEL(NDIMM,*)
+!       DIMENSION NEL(NDIMM,*)
 
       DO 60 I=1,MAXTQE
       CALL ISPITA(ACOZ)
       IF(INPT.EQ.1) THEN      
       READ(ACOZ,1025) NELTOK(1,I),NELTOK(2,I),NELTOK(3,I),NELTOK(4,I)
      1,NELTOK(5,I),NELTOK(6,I),NELTOK(7,I),NELTOK(8,I),NELTOK(9,I),
-     2 NELTOK(10,I),NELTOK(11,I),NELTOK(12,I),HFACE(I)
+     2 NELTOK(10,I),NELTOK(11,I),NELTOK(12,I)
+!      2 NELTOK(10,I),NELTOK(11,I),NELTOK(12,I),HFACE(I)
       ELSE
       READ(ACOZ,1015) NELTOK(1,I),NELTOK(2,I),NELTOK(3,I),NELTOK(4,I)
      1,NELTOK(5,I),NELTOK(6,I),NELTOK(7,I),NELTOK(8,I),NELTOK(9,I),
-     2 NELTOK(10,I),NELTOK(11,I),NELTOK(12,I),HFACE(I)
+     2 NELTOK(10,I),NELTOK(11,I),NELTOK(12,I)
+!      2 NELTOK(10,I),NELTOK(11,I),NELTOK(12,I),HFACE(I)
       ENDIF
-
+      IF(ISNUMER.EQ.1)THEN
+         NN=NELTOK(1,I)
+         N=NN-NMI+1
+         NI=MELCV(N)
+         IF(NI.EQ.0.OR.NN.LT.NMI.OR.NN.GT.NMA) THEN
+           IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN
+           IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN
+            STOP ' PROGRAM STOP - PAKV5 1- ULA3D4TOK'
+          ENDIF
+          NELTOK(1,I)=NI
+         DO IJK=2,9
+           NN=NELTOK(IJK,I)
+           N=NN-NPI+1
+           if(NN.EQ.0) then
+             NI=NN
+             goto 59
+           ENDIF
+           NI=NELCV(N)
+           IF(NN.LT.NPI.OR.NN.GT.NPA) THEN
+             IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN
+             IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN
+             STOP ' PROGRAM STOP - PAKV5 -3 ULA3D4TOK'
+           ENDIF
+ 59        NELTOK(IJK,I)=NI
+         ENDDO
+      ENDIF
+!  odredjivanje tezista stranice na kojoj je zadata prelaznost (ne stampa u translatoru za slobodnu numeraciju)
+         tez=0.0
+         icvor=0
+         DO IZF=2,4
+           IF(NELTOK(IZF,I).GT.0) THEN
+             tez=tez+CORD(3,NELTOK(IZF,I))
+             icvor=icvor+1
+           ENDIF
+         ENDDO
+         tez=tez/icvor
+         HFACE(I)=tez
+!          write(3,*)'tez ',NELTOK(1,I),HFACE(I)
   60   CONTINUE
   
-      IF(INDSC.EQ.2) RETURN
-
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
 !  1015 FORMAT(12I5,F10.4)
  1015 FORMAT(9I5,I10,2I5,F10.4)
  1025 FORMAT(11I10,I5,F10.4)
@@ -264,11 +356,17 @@ C==========================================================================
      2 NELTOK(10,I),NELTOK(11,I),NELTOK(12,I),HFACE(I),npov
       ENDIF
   72  CONTINUE
- 1016 FORMAT(I10,9I5,2I5,F10.4,I5)
+ 1016 FORMAT(I10,8I5,I10,2I5,F10.4,I5)
  1017 FORMAT(11I10,I5,F10.4,I5)
+ 2100 FORMAT(//' GRESKA U UCITAVANJU ZADATIH POT/TEMP'/
+     1' CVOR',I10,' NE POSTOJI'//' PROGRAM STOP - PAK051 - FSPOLJ'//)
+ 6100 FORMAT(//' ERROR IN INPUT DATA ABOUT PRESCRIBE POT/TEM'/
+     1' NODE',I10,' NOT EXIST'//' PROGRAM STOP - PAK051 - FSPOLJ'//)
       END
 C==========================================================================
-      SUBROUTINE ULA3D4R()
+      SUBROUTINE ULA3D4R(ISNUMER,NET)
+      USE NODES
+      USE ELEMENTS
       USE PREDISCRIBED
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 
@@ -292,6 +390,32 @@ C==========================================================================
       READ(ACOZ,1015) NELR(1,I),NELR(2,I),NELR(3,I),NELR(4,I)
      1,NELR(5,I),NELR(6,I),NELR(7,I),NELR(8,I),NELR(9,I),
      2 NELR(10,I),NELR(11,I),NELR(12,I)
+      ENDIF
+      IF(ISNUMER.EQ.1)THEN
+         NN=NELR(1,I)
+         N=NN-NMI+1
+         NI=MELCV(N)
+         IF(NI.EQ.0.OR.NN.LT.NMI.OR.NN.GT.NMA) THEN
+           IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN
+           IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN
+            STOP ' PROGRAM STOP - PAKV5 3- ULA3D4R'
+          ENDIF
+          NELR(1,I)=NI
+         DO IJK=2,9
+           NN=NELR(IJK,I)
+           N=NN-NPI+1
+           NI=NELCV(N)
+           IF(NN.LT.NPI.OR.NN.GT.NPA) THEN
+             IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN
+             IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN
+             STOP ' PROGRAM STOP - PAKV5 -3 ULA3D4R'
+           ENDIF
+           NELR(IJK,I)=NI
+         ENDDO
       ENDIF
 
   60   CONTINUE
@@ -318,6 +442,10 @@ C==========================================================================
   72  CONTINUE
  1016 FORMAT(I10,9I5,2I5)
  1017 FORMAT(I10,9I10,2I5)
+ 2100 FORMAT(//' GRESKA U UCITAVANJU ZADATIH POT/TEMP'/
+     1' CVOR',I10,' NE POSTOJI'//' PROGRAM STOP - PAK051 - FSPOLJ'//)
+ 6100 FORMAT(//' ERROR IN INPUT DATA ABOUT PRESCRIBE POT/TEM'/
+     1' NODE',I10,' NOT EXIST'//' PROGRAM STOP - PAK051 - FSPOLJ'//)
       END
 C==========================================================================
       SUBROUTINE ULA3D4VODE()
@@ -410,18 +538,27 @@ C==========================================================================
  1017 FORMAT(3I10,F10.4)
       END
 C==========================================================================
-      SUBROUTINE ULKONT(KONT)
+      SUBROUTINE ULKONT(KONT,ISNUMER,NET)
+      USE NODES
+      USE ELEMENTS
       USE KONTURE
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /VOPTIM/ NKONT,MAXLIN
       COMMON /ICITANJE/INPT
+      COMMON /PRIKAZ/ INDSC,IZPOT
 
       CHARACTER*250 ACOZ
 
       DIMENSION KONT(9,MAXLIN,*)
-      if (.not.allocated(LIN)) allocate(LIN(MAXLIN),STAT=istat)
+      if (.not.allocated(LIN)) allocate(LIN(NKONT),STAT=istat)
+      if (.not.allocated(QUK)) allocate(QUK(NKONT),STAT=istat)
+      if (.not.allocated(QUM)) allocate(QUM(NKONT),STAT=istat)
+      IF(ISNUMER.EQ.1)THEN
+        if (.not.allocated(LINSN)) 
+     1     allocate(LINSN(NKONT),STAT=istat)
+      ENDIF
 C
 C
       DO 60 I=1,NKONT
@@ -436,10 +573,18 @@ C
          READ(ACOZ,1011) KKONT,NLINE
 !          WRITE(IIZLAZ,1014) KKONT,NLINE
       endif
-      IF(KKONT.GT.NKONT) STOP 'KKONT>NKONT'
-      WRITE(IIZLAZ,432) I,KKONT
-      WRITE(IIZLAZ,1014) KKONT,NLINE
-      LIN(KKONT)=NLINE	
+      IF(ISNUMER.EQ.0)THEN
+        IF(KKONT.GT.NKONT) STOP 'KKONT>NKONT'
+        WRITE(IIZLAZ,432) I,KKONT
+        WRITE(IIZLAZ,1014) KKONT,NLINE
+        LIN(KKONT)=NLINE	
+      ELSEIF(ISNUMER.EQ.1)THEN
+        WRITE(IIZLAZ,432) I,KKONT
+        WRITE(IIZLAZ,1014) KKONT,NLINE
+        LIN(I)=NLINE	
+        LINSN(I)=KKONT
+        KKONT=I
+      ENDIF
 !       LIN(I)=NLINE	
       DO 80 J=1,NLINE
       CALL ISPITA(ACOZ)
@@ -460,19 +605,45 @@ C
       READ(ACOZ,1013) KONT(1,J,KKONT),KONT(2,J,KKONT),KONT(3,J,KKONT),
      &                KONT(4,J,KKONT),KONT(5,J,KKONT),KONT(6,J,KKONT),
      &                KONT(7,J,KKONT),KONT(8,J,KKONT),KONT(9,J,KKONT)
-      WRITE(IIZLAZ,1014) KONT(1,J,KKONT),KONT(2,J,KKONT),
-     &                KONT(3,J,KKONT),KONT(4,J,KKONT),KONT(5,J,KKONT),
-     &                KONT(6,J,KKONT),KONT(7,J,KKONT),KONT(8,J,KKONT),
-     &                KONT(9,J,KKONT)
       ELSE
       READ(ACOZ,1011) KONT(1,J,KKONT),KONT(2,J,KKONT),KONT(3,J,KKONT),
      &                KONT(4,J,KKONT),KONT(5,J,KKONT),KONT(6,J,KKONT),
      &                KONT(7,J,KKONT),KONT(8,J,KKONT),KONT(9,J,KKONT)
-      WRITE(IIZLAZ,1012) KONT(1,J,KKONT),KONT(2,J,KKONT),
+      ENDIF
+      IF(ISNUMER.EQ.1)THEN
+         NN=KONT(1,J,KKONT)
+         N=NN-NMI+1
+         NI=MELCV(N)
+         IF(NI.EQ.0.OR.NN.LT.NMI.OR.NN.GT.NMA) THEN
+           IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2101) NN,I,J
+           IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6101) NN,I,J
+            STOP ' PROGRAM STOP - PAKV5 1- ULKONT'
+          ENDIF
+          KONT(1,J,KKONT)=NI
+          DO IJK=2,9
+           NN=KONT(IJK,J,KKONT)
+           IF(NN.EQ.0) GO TO 58
+           N=NN-NPI+1
+           NI=NELCV(N)
+           IF(NN.LT.NPI.OR.NN.GT.NPA) THEN
+!            IF(NI.EQ.0.OR.NN.LT.NPI.OR.NN.GT.NPA) THEN
+             IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN
+             IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN
+             STOP ' PROGRAM STOP - PAKV5 -3 ULKONT'
+           ENDIF
+           KONT(IJK,J,KKONT)=NI
+ 58       CONTINUE    
+       ENDDO
+      ENDIF
+       IF(INDSC.EQ.2.OR.INDSC.EQ.1) go to 80
+      WRITE(IIZLAZ,1013) KONT(1,J,KKONT),KONT(2,J,KKONT),
      &                KONT(3,J,KKONT),KONT(4,J,KKONT),KONT(5,J,KKONT),
      &                KONT(6,J,KKONT),KONT(7,J,KKONT),KONT(8,J,KKONT),
      &                KONT(9,J,KKONT)
-      ENDIF
   80  CONTINUE
   60  CONTINUE
 C
@@ -484,6 +655,16 @@ C
  1013 FORMAT(9I10)
  1014 FORMAT(5X,9I11)
 C
+ 2100 FORMAT(//' GRESKA U UCITAVANJU KONTURA'/
+     1' CVOR',I10,' NE POSTOJI'//' PROGRAM STOP - PAKV5 - ULKONT'//)
+ 6100 FORMAT(//' ERROR IN INPUT DATA ABOUT CONTOURS'/
+     1' NODE',I10,' NOT EXIST'//' PROGRAM STOP - PAKV5 - ULKONT'//)
+      WRITE(IIZLAZ,*) 
+ 2101 FORMAT(//' GRESKA U UCITAVANJU KONTURA'/
+     1' EL',I10,' NE POSTOJI, na KONURI 'I5, 'red el.',I5
+     1  //' PROGRAM STOP - PAKV5 - ULKONT'//)
+ 6101 FORMAT(//' ERROR IN INPUT DATA ABOUT CONTOURS'/
+     1' NODE',I10,' NOT EXIST'//' PROGRAM STOP - PAKV5 - ULKONT'//)
       WRITE(IIZLAZ,*) 
       END
 C==========================================================================
@@ -557,7 +738,7 @@ CS OTVARANJE DATOTEKE ZA GRAFIKU
 CE OPEN FILE FOR GRAPHIC
       COMMON /SRPSKI/ ISRPS
       COMMON /IMEULZ/ PAKLST,PAKUNV,ZSILE,PAKNEU,IDUZIN,ZTEMP
-      CHARACTER *24 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
+      CHARACTER *54 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
       CHARACTER*1 IME*20,STAT*3
       LOGICAL OLDNEW
       COMMON /CDEBUG/ IDEBUG
@@ -603,11 +784,14 @@ CS OTVARANJE DATOTEKE ZA UPISIVANJE ZAPREMINSKIH SILA
 CE OPEN FILE FOR WRITING OF VOLUME FORCES
       COMMON /SRPSKI/ ISRPS
       COMMON /IMEULZ/ PAKLST,PAKUNV,ZSILE,PAKNEU,IDUZIN,ZTEMP
-      COMMON /DJERDAP/ IDJERDAP
-      CHARACTER *24 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
-      CHARACTER*1 IME*20,STAT*3
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
+      CHARACTER *54 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
+      CHARACTER*1 STAT*3
       CHARACTER IMEDJ(5)*25
       LOGICAL OLDNEW
+      CHARACTER*10 IME
+      CHARACTER*2 IMECSV
+      CHARACTER*1 IMECSV1
 
       COMMON /CDEBUG/ IDEBUG
       IF(IDEBUG.GT.0) PRINT *, ' OTVGRA'
@@ -615,35 +799,86 @@ C
 CS IZLAZ ZA ZAPREMINSKE SILE
 CE OUTPUT FOR VOLUME FORCES
 C
-      IME = ZSILE
       IFILE=105
-      IMEDJ(1) = ZSILE
-      IMEDJ(2) = ZSILE//'2'
-      IMEDJ(3) = ZSILE//'3'
-      IMEDJ(4) = ZSILE//'4'
-      IMEDJ(5) = ZSILE//'5'
-      IF(IDJERDAP.EQ.1) THEN
-        DO IK=1,5
-          IFILE=IFILE+1
+!       IMEDJ(1) = ZSILE
+!       IMEDJ(2) = ZSILE//'2'
+!       IMEDJ(3) = ZSILE//'3'
+!       IMEDJ(4) = ZSILE//'4'
+!       IMEDJ(5) = ZSILE//'5'
+      IF(IDJERDAP.GE.1) THEN
+       IF ((IDJERDAP.GE.10).AND.(IDJERDAP.LE.14)) THEN
+         write(IMECSV,31) IDJERDAP
+         IME='L' // IMECSV // '-ND.ZS'    
+       ELSEIF ((IDJERDAP.LT.10))THEN
+         write(IMECSV1,30) IDJERDAP
+         IME='L' // IMECSV1 // '-ND.ZS'    
+       ELSEIF ((IDJERDAP.EQ.15))THEN
+         IME='SIII-ND.ZS'    
+       ELSEIF ((IDJERDAP.EQ.16))THEN
+         IME='SII-ND.ZS'    
+       ELSEIF ((IDJERDAP.EQ.17))THEN
+         IME='SI-ND.ZS'    
+       ELSEIF ((IDJERDAP.EQ.18))THEN
+         IME='MB-ND.ZS'    
+       ENDIF
+       DO IK=1,1
+          IFILE=IFILE+IDJERDAP
    16     CONTINUE
    21     STAT='NEW'
-          INQUIRE(FILE=IMEDJ(IK),EXIST=OLDNEW)
+          INQUIRE(FILE=IME,EXIST=OLDNEW)
           IF(OLDNEW) STAT='OLD'
           IF(STAT.EQ.'NEW') THEN
-       OPEN (IFILE,FILE=IMEDJ(IK),STATUS='NEW',FORM='FORMATTED',
+       OPEN (IFILE,FILE=IME,STATUS='NEW',FORM='FORMATTED',
      1 ACCESS='SEQUENTIAL')
                          ELSE
-       OPEN (IFILE,FILE=IMEDJ(IK),STATUS='OLD',FORM='FORMATTED',
+       OPEN (IFILE,FILE=IME,STATUS='OLD',FORM='FORMATTED',
      1 ACCESS='SEQUENTIAL')
                          ENDIF
          IND=0
-         IF(STAT.EQ.'OLD') CALL BRISZST (IMEDJ(IK),IFILE,IND)
+         IF(STAT.EQ.'OLD') CALL BRISZST (IME,IFILE,IND)
          IF(IND.EQ.1)GO TO 21
          IF(IND.EQ.2)GO TO 16
+       ENDDO
+      ELSEIF (IDJERDAP.EQ.-1) THEN
+       DO IK=1,18
+       IFILE=105
+       IIDJERDAP=IK
+       IF ((IIDJERDAP.GE.10).AND.(IIDJERDAP.LE.14)) THEN
+         write(IMECSV,31) IIDJERDAP
+         IME='L' // IMECSV // '-ND.ZS'    
+       ELSEIF ((IIDJERDAP.LT.10))THEN
+         write(IMECSV1,30) IIDJERDAP
+         IME='L' // IMECSV1 // '-ND.ZS'    
+       ELSEIF ((IIDJERDAP.EQ.15))THEN
+         IME='SIII-ND.ZS'    
+       ELSEIF ((IIDJERDAP.EQ.16))THEN
+         IME='SII-ND.ZS'    
+       ELSEIF ((IIDJERDAP.EQ.17))THEN
+         IME='SI-ND.ZS'    
+       ELSEIF ((IIDJERDAP.EQ.18))THEN
+         IME='MB-ND.ZS'    
+       ENDIF
+          IFILE=IFILE+IIDJERDAP
+   26     CONTINUE
+   41     STAT='NEW'
+          INQUIRE(FILE=IME,EXIST=OLDNEW)
+          IF(OLDNEW) STAT='OLD'
+          IF(STAT.EQ.'NEW') THEN
+       OPEN (IFILE,FILE=IME,STATUS='NEW',FORM='FORMATTED',
+     1 ACCESS='SEQUENTIAL')
+                         ELSE
+       OPEN (IFILE,FILE=IME,STATUS='OLD',FORM='FORMATTED',
+     1 ACCESS='SEQUENTIAL')
+                         ENDIF
+         IND=0
+         IF(STAT.EQ.'OLD') CALL BRISZST (IME,IFILE,IND)
+         IF(IND.EQ.1)GO TO 41
+         IF(IND.EQ.2)GO TO 26
         ENDDO
-      ELSE
+       ELSEIF (IDJERDAP.EQ.0) THEN
    15  CONTINUE
    20  STAT='NEW'
+       IME = ZSILE
        INQUIRE(FILE=IME,EXIST=OLDNEW)
        IF(OLDNEW) STAT='OLD'
        IF(STAT.EQ.'NEW') THEN
@@ -658,71 +893,109 @@ C
          IF(IND.EQ.1)GO TO 20
          IF(IND.EQ.2)GO TO 15
        ENDIF
+   30  FORMAT (I1)
+   31  FORMAT (I2)
 C
       RETURN
       END
 C==========================================================================
 C
 C======================================================================
-      SUBROUTINE OTVTEMP
+      SUBROUTINE OTVTEMP(KKORAK)
 CS OTVARANJE DATOTEKE ZA UPISIVANJE TEMPERATURA
 CE OPEN FILE FOR WRITING OF VOLUME FORCES
       COMMON /SRPSKI/ ISRPS
       COMMON /IMEULZ/ PAKLST,PAKUNV,ZSILE,PAKNEU,IDUZIN,ZTEMP
-      COMMON /DJERDAP/ IDJERDAP
-      CHARACTER *24 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
-      CHARACTER*1 IME*20,STAT*3
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
+      CHARACTER *54 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
+      CHARACTER*1 IME*50,STAT*3
       CHARACTER IMEDJ(5)*25
       LOGICAL OLDNEW
+      CHARACTER*2 IMECSV,ik2
+      CHARACTER*1 IMECSV1,ik1
       COMMON /CDEBUG/ IDEBUG
       IF(IDEBUG.GT.0) PRINT *, ' OTVGRA'
 C
 CS IZLAZ ZA ZAPREMINSKE SILE
 CE OUTPUT FOR VOLUME FORCES
 C
-      IME = ZTEMP
-      IFILE=105
-      IMEDJ(1) = ZTEMP
-      IMEDJ(2) = ZTEMP//'2'
-      IMEDJ(3) = ZTEMP//'3'
-      IMEDJ(4) = ZTEMP//'4'
-      IMEDJ(5) = ZTEMP//'5'
-      IF(IDJERDAP.EQ.1) THEN
-        DO IK=1,5
-          IFILE=IFILE+1
+!       IME = ZTEMP
+!       IFILE=105
+       IFILE=105
+        IF(KKORAK.GE.10)THEN
+          write(ik2,31) KKORAK
+c          IME=IME // ik2 // '.T'    
+        IF ((IDJERDAP.GE.10).AND.(IDJERDAP.LE.14)) THEN
+          write(IMECSV,31) IDJERDAP
+        IME='L' // IMECSV // '-ND' // ik2 // '.T'   
+        ELSEIF (IDJERDAP.LT.10)THEN
+          write(IMECSV1,30) IDJERDAP
+        IME='L' // IMECSV1 // '-ND' // ik2 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.15))THEN
+          IME='SIII-ND' // ik2 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.16))THEN
+          IME='SII-ND'  // ik2 // '.T' 
+        ELSEIF ((IDJERDAP.EQ.17))THEN
+          IME='SI-ND' // ik2 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.18))THEN
+          IME='MB-ND' // ik2 // '.T'   
+        ENDIF
+        ELSEIF(KKORAK.LT.10)THEN
+          write(ik1,30) KKORAK
+c          IME=IME // ik1 // '.T'    
+         IF ((IDJERDAP.GE.10).AND.(IDJERDAP.LE.14)) THEN
+          write(IMECSV,31) IDJERDAP
+        IME='L' // IMECSV // '-ND' // ik1 // '.T'   
+        ELSEIF (IDJERDAP.LT.10)THEN
+          write(IMECSV1,30) IDJERDAP
+        IME='L' // IMECSV1 // '-ND' // ik1 // '.T'    
+        ELSEIF ((IDJERDAP.EQ.15))THEN
+          IME='SIII-ND' // ik1 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.16))THEN
+          IME='SII-ND'  // ik1 // '.T'  
+        ELSEIF ((IDJERDAP.EQ.17))THEN
+          IME='SI-ND' // ik1 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.18))THEN
+          IME='MB-ND' // ik1 // '.T'  
+        ENDIF
+       ENDIF
+          IFILE=IFILE+IDJERDAP+KKORAK
+!           write(*,*) ".T  ",IME,IFILE
    16     CONTINUE
    21     STAT='NEW'
-          INQUIRE(FILE=IMEDJ(IK),EXIST=OLDNEW)
+          INQUIRE(FILE=IME,EXIST=OLDNEW)
           IF(OLDNEW) STAT='OLD'
           IF(STAT.EQ.'NEW') THEN
-       OPEN (IFILE,FILE=IMEDJ(IK),STATUS='NEW',FORM='FORMATTED',
+       OPEN (IFILE,FILE=IME,STATUS='NEW',FORM='FORMATTED',
      1 ACCESS='SEQUENTIAL')
                          ELSE
-       OPEN (IFILE,FILE=IMEDJ(IK),STATUS='OLD',FORM='FORMATTED',
+       OPEN (IFILE,FILE=IME,STATUS='OLD',FORM='FORMATTED',
      1 ACCESS='SEQUENTIAL')
                          ENDIF
          IND=0
-         IF(STAT.EQ.'OLD') CALL BRISZST (IMEDJ(IK),IFILE,IND)
+         IF(STAT.EQ.'OLD') CALL BRISZST (IME,IFILE,IND)
          IF(IND.EQ.1)GO TO 21
          IF(IND.EQ.2)GO TO 16
-        ENDDO
-      ELSE
-   15  CONTINUE
-   20  STAT='NEW'
-       INQUIRE(FILE=IME,EXIST=OLDNEW)
-       IF(OLDNEW) STAT='OLD'
-       IF(STAT.EQ.'NEW') THEN
-      OPEN (19,FILE=IME,STATUS='NEW',FORM='FORMATTED',
-     1 ACCESS='SEQUENTIAL')
-                        ELSE
-      OPEN (19,FILE=IME,STATUS='OLD',FORM='FORMATTED',
-     1 ACCESS='SEQUENTIAL')
-                        ENDIF
-         IND=0
-         IF(STAT.EQ.'OLD') CALL BRISZST (IME,19,IND)
-         IF(IND.EQ.1)GO TO 20
-         IF(IND.EQ.2)GO TO 15
-       ENDIF
+!         ENDDO
+!       ELSE
+!    15  CONTINUE
+!    20  STAT='NEW'
+!        INQUIRE(FILE=IME,EXIST=OLDNEW)
+!        IF(OLDNEW) STAT='OLD'
+!        IF(STAT.EQ.'NEW') THEN
+!       OPEN (19,FILE=IME,STATUS='NEW',FORM='FORMATTED',
+!      1 ACCESS='SEQUENTIAL')
+!                         ELSE
+!       OPEN (19,FILE=IME,STATUS='OLD',FORM='FORMATTED',
+!      1 ACCESS='SEQUENTIAL')
+!                         ENDIF
+!          IND=0
+!          IF(STAT.EQ.'OLD') CALL BRISZST (IME,19,IND)
+!          IF(IND.EQ.1)GO TO 20
+!          IF(IND.EQ.2)GO TO 15
+!        ENDIF
+   30  FORMAT (I1)
+   31  FORMAT (I2)
 C
       RETURN
       END
@@ -734,8 +1007,8 @@ CS OTVARANJE DATOTEKE ZA NEU GRAFIKU
 CE OPEN FILE FOR NEU GRAPHIC
       COMMON /SRPSKI/ ISRPS
       COMMON /IMEULZ/ PAKLST,PAKUNV,ZSILE,PAKNEU,IDUZIN,ZTEMP
-      CHARACTER *24 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
-      CHARACTER*1 IME*20,STAT*3
+      CHARACTER *54 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
+      CHARACTER*1 IME*50,STAT*3
       LOGICAL OLDNEW
       COMMON /CDEBUG/ IDEBUG
       IF(IDEBUG.GT.0) PRINT *, ' OTVGRA'
@@ -1376,8 +1649,10 @@ C-----------------------------------------------------------------------
       END
 C=======================================================================
 C=======================================================================
-      SUBROUTINE STAG3D(RTH,ID,NASLOV,VREME,KOR,NDT,NP,II,IND,NET,NEL,
-     1KORAK,VECTJ,CORD,GRADJN,NZAD,FZAPR)
+      SUBROUTINE STAG3D(RTH,NASLOV,VREME,KOR,NDT,NP,II,IND,NET,
+     1KORAK,VECTJ,GRADJN,NZAD,FZAPR,ISNUMBER)
+      USE NODES
+      USE ELEMENTS
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /POCETN/ IPOCU,IPOCV,IPOCP,IPOCT,POCU,POCV,POCP,POCT,GAMA
       COMMON /TIPEL/ NP2DMX
@@ -1402,8 +1677,8 @@ CS.      ZA STAMPANJE POMERANJA, BRZINA I UBRZANJA U UNIVERZALNI FILE
 C .
 C ......................................................................
 C
-      DIMENSION NEL(NDIMM,*),CORD(3,*)
-      DIMENSION RTH(*),ID(1,*)
+!       DIMENSION NEL(NDIMM,*),CORD(3,*)
+      DIMENSION RTH(*)
       DIMENSION ISP(6)
       DIMENSION VECTJ(3,*),GRADJN(3,*),NZAD(3,*),FZAPR(3,*)
 
@@ -1469,7 +1744,11 @@ C
        DO I=1,NP
 C 5000 FORMAT(2I10,6I2)
 C            WRITE(II,5000) NC,ICOL,(ISP(J),J=1,6)
-            WRITE(II,5001) I,ICOL,(ISP(J),J=1,6)
+         IF(ISNUMBER.EQ.0) THEN
+           WRITE(II,5001) I,ICOL,(ISP(J),J=1,6)
+         ELSE
+           WRITE(II,5001) NCVEL(I),ICOL,(ISP(J),J=1,6)
+         ENDIF
 C            WRITE(II,5200) (FSP(J),J=1,6)
          WRITE(II,5200) (FZAPR(J,I),J=1,3)
        ENDDO
@@ -1506,7 +1785,11 @@ C
       IF(NDT.GT.1) WRITE(II,5000) IFAT1,IFAT2,KOR,KOR
       WRITE(II,5200) FATY8
        DO I=1,NP
-            WRITE(II,5000) I
+         IF(ISNUMBER.EQ.0) THEN
+           WRITE(II,5000) I
+         ELSE
+           WRITE(II,5000) NCVEL(I)
+         ENDIF
          WRITE(II,5200) (FZAPR(J,I),J=1,3)
        ENDDO
 C
@@ -1534,7 +1817,11 @@ C      WRITE(II,5000) IMOTY,IANTY,IDACH,ISDTY,IDATY,1
       IF(NDT.GT.1) WRITE(II,5000) IFAT1,IFAT2,KOR,KOR
       WRITE(II,5200) FATY8
        DO I=1,NP
-            WRITE(II,5000) I
+          IF(ISNUMBER.EQ.0) THEN
+           WRITE(II,5000) I
+         ELSE
+           WRITE(II,5000) NCVEL(I)
+         ENDIF
             POT=1.0D0
           DO J=1,NUMZAD 
               IF(NZAD(1,J).EQ.I) GOTO 1201
@@ -1545,7 +1832,7 @@ C      WRITE(II,5000) IMOTY,IANTY,IDACH,ISDTY,IDATY,1
       WRITE(II,5100) IND1
 C
 C
-C ZA ISPISIVANJE RELATIVNIH BRZINA FLUIDA
+C ZA ISPISIVANJE RELATIVNIH BRZINA 
 C
 C
 C     IF (INDJOT.EQ.1) THEN
@@ -1581,7 +1868,11 @@ C     ISDTY=500
       IF(NDT.GT.1) WRITE(II,5000) IFAT1,IFAT2,KOR,KOR
       WRITE(II,5200) FATY8
        DO I=1,NP
-            WRITE(II,5000) I
+         IF(ISNUMBER.EQ.0) THEN
+           WRITE(II,5000) I
+         ELSE
+           WRITE(II,5000) NCVEL(I)
+         ENDIF
          WRITE(II,5200) (VECTJ(J,I),J=1,3)
        ENDDO
       WRITE(II,5100) IND1
@@ -1614,7 +1905,11 @@ C     1WRITE(II,2006)
       IF(NDT.GT.1) WRITE(II,5000) IFAT1,IFAT2,KOR,KOR
       WRITE(II,5200) FATY8
        DO I=1,NP
-            WRITE(II,5000) I
+         IF(ISNUMBER.EQ.0) THEN
+           WRITE(II,5000) I
+         ELSE
+           WRITE(II,5000) NCVEL(I)
+         ENDIF
          WRITE(II,5200) (GRADJN(J,I),J=1,3)
        ENDDO
 C      WRITE(II,5100) IND1
@@ -1646,7 +1941,11 @@ C
       IF(NDT.GT.1) WRITE(II,5000) IFAT1,IFAT2,KOR,KOR
       WRITE(II,5200) FATY8
        DO I=1,NP
-            WRITE(II,5000) I
+         IF(ISNUMBER.EQ.0) THEN
+           WRITE(II,5000) I
+         ELSE
+           WRITE(II,5000) NCVEL(I)
+         ENDIF
             POT=0.D0
             IF(ID(1,I).EQ.0) GOTO 1200
             K=ID(1,I)
@@ -1714,11 +2013,11 @@ C=======================================================================
 C=======================================================================
       SUBROUTINE IMENA(IME)
       COMMON /IMEULZ/ PAKLST,PAKUNV,ZSILE,PAKNEU,IDUZIN,ZTEMP
-      CHARACTER *24 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
-      CHARACTER *20 IME
+      CHARACTER *54 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
+      CHARACTER *50 IME
      
         IB=INDEX(IME,'.')
-        DO 20 I=1,20
+        DO 20 I=1,50
        IF (IME(I:I).EQ.' ') GOTO 30
         IA=I
   20    CONTINUE      
@@ -2626,6 +2925,7 @@ C=======================================================================
       SUBROUTINE IZBACI(TT1,CORD,ID,NPT,NEL,NET,IOSA,NDIM,IIZLAZ)
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /DODAT/ NDIMM
+      COMMON /PRIKAZ/ INDSC,IZPOT
       DIMENSION NEL(NDIMM,*),CORD(3,*)
       DIMENSION TT1(*),ID(1,*)
 C
@@ -2642,7 +2942,7 @@ C
          NEMA=0
          IF(PR.LT.1.D-12) NEMA=1
          NEL(NDIM+2,I)=NEMA
-         WRITE(IIZLAZ,1000) NEMA
+         IF(INDSC.EQ.0) WRITE(IIZLAZ,1000) NEMA
       ENDDO
       WRITE(IIZLAZ,1001) 'C'
       WRITE(IIZLAZ,1000) NPT
@@ -2657,11 +2957,13 @@ C
            ENDDO
          ENDIF
       ENDDO
-      DO I=1,NPT
-         WRITE(IIZLAZ,1000) I,ID(1,I)
-      ENDDO
+      IF(INDSC.EQ.0)THEN
+        DO I=1,NPT
+           WRITE(IIZLAZ,1000) I,ID(1,I)
+        ENDDO
+      ENDIF
       RETURN
- 1000 FORMAT(14I5)
+ 1000 FORMAT(14I10)
  1001 FORMAT(A1)
       END
         

@@ -1,14 +1,16 @@
 C$DEBUG      
 C=========================================================================
       SUBROUTINE RACN3D(TT1,SILE,
-     1ID,NZAD,ZADVRE,NGPSIL,MAXA,CORD,SKEF,SKEFN,KONT,
+     1NZAD,ZADVRE,NGPSIL,MAXA,SKEF,SKEFN,KONT,
      2FZAPR,VREME,TABF,TT10,UBRZ,UBRZ0,AK,
      3VECTJ,IVECT,POVSIL,GRADJN,
-     4ITFMAX,AKONST,NASLOV,ICUR,VG,GG,KOJK)
+     4ITFMAX,AKONST,NASLOV,ICUR,VG,GG,KOJK,ISNUMER)
       USE PPR
       USE STIFFNESS
+      USE NODES
       USE ELEMENTS
       USE KONTURE
+      USE PREDISCRIBED
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 
       include 'paka.inc'
@@ -55,20 +57,22 @@ C
       COMMON /NXNAST/ NXNASTRAN
       COMMON /SOLVER/ ISOLVER
       COMMON /NELDIM/ NDIMEL
-      COMMON /DJERDAP/ IDJERDAP
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
       COMMON /STAMPAZT/ NPRINT
 C
       CHARACTER*80 NASLOV
-      DIMENSION TT1(*),SILE(*),ZADVRE(*),CORD(3,*)
+      DIMENSION TT1(*),SILE(*),ZADVRE(*)
       DIMENSION VG(3,NET,*),GG(3,NET,*)
       DIMENSION TT10(*),UBRZ(*),UBRZ0(*)
-      DIMENSION ID(1,*),NZAD(3,*),NGPSIL(12,*),MAXA(*)
+!       DIMENSION ID(1,*),NZAD(3,*),NGPSIL(12,*),MAXA(*),CORD(3,*)
+      DIMENSION NZAD(3,*),NGPSIL(12,*),MAXA(*)
       DIMENSION SKEF(NDES,*),AKONST(3,5,*),SKEFN(*)
       DIMENSION POVSIL(4,*),PR1(21),ITFMAX(*)
 C
       DIMENSION KONT(9,MAXLIN,*),KOJK(*)
 
-      DIMENSION TT21(44),TT210(44),QUK(1000),QUM(1000)
+      DIMENSION TT21(44),TT210(44)
+!       ,QUK(1000),QUM(1000)
       DIMENSION R(3,3),S(3,3),T(3,3),W(3,3)
       DIMENSION RK(3,3),SK(3,3),TK(3,3),WK(3,3)
       DIMENSION FZAPR(3,*),VECTJ(3,*),GRADJN(3,*)
@@ -101,30 +105,27 @@ C
       integer Dtime(8)
 C
       CHARACTER*3 STATTT
-      DIMENSION NDJEL(21),NP3D1(5)
+      DIMENSION NDJEL(21),NP3D1(18)
       logical OLDNEWW
 
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
 
-      IF (myid.ne.0) goto 1234
+      IF (myid.ne.0) goto 1235
   
       if (.not.allocated(PORNIEL)) allocate(PORNIEL(NET,10),STAT=istat) 
-!       CALL ICLEAR(IDJSTAMP1,NPT)
 C      IDJERDAP=1
-!          write(*,*) 'IDJERDAP',IDJERDAP
-      IF(IDJERDAP.EQ.1)THEN
-      if(.not.allocated(IDJSTAMP1))allocate(IDJSTAMP1(5,NPT),STAT=istat) 
-      DO I=1,5
-        DO JJ=1,NPT
-          IDJSTAMP1(I,JJ)=0
-        ENDDO
-      ENDDO
-C
-      CALL ICLEAR(NP3D1,5)
-C   program za citanje cvorova u kojima se stampaju filtracione sile
-              CALL DJERDAPREAD(IDJSTAMP1,NP3D1)
-C
-       ENDIF
+!        CITANJE SE RADI PRE STAMPE 
+!       IF(IDJERDAP.GE.1)THEN
+!       CALL ICLEAR(NP3D1,5)
+! C   podprogram za citanje cvorova u kojima se stampaju filtracione sile
+!               CALL DJERDAPREADT(NP3D1,ISNUMER,II)
+!        ELSEIF(IDJERDAP.EQ.-1)THEN
+! C   stampaju se filtracione sile za sve lamele/sekcije
+!       CALL ICLEAR(NP3D1,18)
+!           DO II=1,18
+!              CALL DJERDAPREADT(NP3D1,ISNUMER,II)
+!           ENDDO
+!        ENDIF
 C INDIKATOR ZA OSU TEZINE
  9998   IF (IOSA.EQ.0) IOSA=3
 
@@ -220,11 +221,15 @@ C indikator LINTE=1 - linearan proracun
 C=========================================================================
           CALL DATE_AND_TIME(VALUES=Dtime)
           WRITE(*,*) 'vreme pre petlje po koracima', (Dtime(i),i=5,7)
+          WRITE(3,*) 'vreme pre petlje po koracima', (Dtime(i),i=5,7)
 c petlja po periodima
+1235  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(NPER,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
       DO 600 NNPER=1,NPER
       KORAK=0
 c petlja po koracima
    35 KORAK=KORAK+1
+      if(myid.ne.0) goto 3456
 C
 C=========================================================================   
 C  RAD SA STACIONARNIM STANJEM U PRVOM KORAKU I NESTACIONARNIM U OSTALIM
@@ -273,7 +278,9 @@ C==========================================================================
      1KONVERGENCIJE!!'//)
        STOP
        ENDIF
-
+       
+      if(myid.ne.0) goto 3456
+      
 	IF (NBLOCK.GT.1) THEN
        OPEN (ISCRC,FILE='ZSKLIN',FORM='UNFORMATTED',STATUS='UNKNOWN')
        REWIND ISCRC
@@ -301,76 +308,7 @@ C===========================================================================
 
 C
       IF((KKORAK.EQ.1).AND.(ITER.EQ.0))THEN
-C petlja po pornim celijama
-!       do II=1,NPORE
-! C odredjivanje lokalnih koordinata porne celije
-!       deltta=0.1
-!       RP=-1.02
-!       SP=-1.02
-!       TP=-1.02
-!       DMIN=100.0
-!       RMIN(II)=100.0
-!       SMIN(II)=100.0
-!       TMIN(II)=100.0
-!       DRST=0.02
-!       DO  IR=1,100
-!         RP=RP+DRST
-!         SP=-1.02
-!       DO  JS=1,100
-!         SP=SP+DRST
-!         TP=-1.02
-!       DO  LT=1,100
-!         TP=TP+DRST
-! c        CALL INTERST(RP,SP,TP)
-!           RPP=1.0+RP
-!           SPP=1.0+SP
-!           TPP=1.0+TP
-!           RM=1.0-RP
-!           TM=1.0-TP
-!           SM=1.0-SP
-!           RR=1.0-RP*RP
-!           SS=1.0-SP*SP
-!           TT=1.0-TP*TP
-!           DO I=1,8
-!             H(I)=0.
-!           ENDDO
-!           H(1)=0.125*RPP*SPP*TPP
-!           H(2)=0.125*RM*SPP*TPP
-!           H(3)=0.125*RM*SM*TPP
-!           H(4)=0.125*RPP*SM*TPP
-!           H(5)=0.125*RPP*SPP*TM
-!           H(6)=0.125*RM*SPP*TM
-!           H(7)=0.125*RM*SM*TM
-!           H(8)=0.125*RPP*SM*TM
-!         XT=0.
-!         YT=0.
-!         ZT=0.
-!         DO JJ=1,8
-!           XT=XT + H(JJ)*CORD(1,NEL(JJ,NPOREL(II)))
-!           YT=YT + H(JJ)*CORD(2,NEL(JJ,NPOREL(II)))
-!           ZT=ZT + H(JJ)*CORD(3,NEL(JJ,NPOREL(II)))
-!         enddo
-!         DX=XT-CPOR(1,II)
-!         DY=YT-CPOR(2,II)
-!         DZ=ZT-CPOR(3,II)
-!         dxyz=DX*DX+DY*DY+DZ*DZ
-!         DXYZ=SQRT(dxyz)
-!         IF (DXYZ.LE.DMIN) THEN
-!             DMIN=DXYZ
-!             RMIN(II)=RP
-!             SMIN(II)=SP
-!             TMIN(II)=TP
-!          ENDIF
-!       enddo
-!       enddo
-!       enddo
-! C  kraj petlje po pornim celijama
-!          iel=NPOREL(II)
-!          NMAT=NEL(NDIM+1,iel)
-!        WRITE (3,*)"PORNA CELIJA", II, NPOREL(II),(CPOR(ijk,II), ijk=1,3)
-!        WRITE(3,*) DMIN,RMIN(II),SMIN(II),TMIN(II),NMAT 
-!       enddo
-      
+!       
         IF ((ISOLVER.EQ.-11).OR.(ISOLVER.EQ.1)) THEN
 C         MUMPS
           CALL sparseassembler_init(1)
@@ -431,9 +369,9 @@ C
       if(NTYPE.eq.2) CALL LCK2D(CK,CKL,TTE,NDIMEL)
 C=======================================================================
       CALL CLEARD(TT21,NDIM)
-      CALL PREB(TT21,TT1,ID,NEL,NBREL)
+      CALL PREB(TT21,TT1,NBREL)
       CALL CLEARD(TT210,NDIM)
-      CALL PREB(TT210,TT10,ID,NEL,NBREL)
+      CALL PREB(TT210,TT10,NBREL)
  
 C=======================================================================
       DO 163 K=1,NDIM
@@ -446,7 +384,7 @@ C=======================================================================
   163 CONTINUE
 
 C POVRSINSKE SILE I ZAPREMINSKE SILE:
-      DO 199 I=1,NDIM
+      DO 199 I=1,NDIM     1
       RS2(I)=0.
       RS3(I)=0.
  199  CONTINUE
@@ -473,7 +411,7 @@ c        ENDDO
       IF(elemtip(NBREL).eq.23.or.elemtip(NBREL).eq.26) THEN
         IBRGT2=1
         IBRGT1=3
-      ENDIF
+      ENDIF     
       DO 180 I=1,IBRGT1
       DO 170 J=1,IBRGT2
       DO 160 L=1,IBRGT2
@@ -889,7 +827,7 @@ C=======================================================================
 C=======================================================================
          CALL DATE_AND_TIME(VALUES=Dtime)
          WRITE(*,*) 'vreme kraj petlje po elementima', (Dtime(i),i=5,7)
-
+         WRITE(3,*) 'vreme kraj petlje po elementima', (Dtime(i),i=5,7)
 C CVOROVI NA LINIJI PROCURIVANJA       
 C=======================================================================
   	 IF (MAXCUR.GT.0) THEN
@@ -899,7 +837,7 @@ C        IF(ITER.EQ.0) CALL CURI1(CORD,A(LSK),SILE,MAXA,TT1,ID,ICUR)
        ENDIF
 C==========================================================================
 C MUMPS alociranje matrice krutosti
-1234  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+3456  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(ITER,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(ISOLVER,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(NBLOCK,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
@@ -938,6 +876,7 @@ c     1                DSPARSE_A,ISPARSE_ROWS,ISPARSE_COLS)
           if(myid.eq.0) CALL sparseassembler_kill()
          CALL DATE_AND_TIME(VALUES=Dtime)
          WRITE(*,*) 'vreme posle sparse kill', (Dtime(i),i=5,7)
+         WRITE(3,*) 'vreme posle sparse kill', (Dtime(i),i=5,7)
 
          IF(KKORAK.EQ.1) THEN
               stiff_n = JEDN
@@ -977,67 +916,62 @@ cz proveriti rad sa blokovima i zadlev
      1                                  CORD,VVREME,TABF,NTABFT,ITFMAX)
           ENDIF
          CALL DATE_AND_TIME(VALUES=Dtime)
-         WRITE(*,*) 'pre resen 1', (Dtime(i),i=5,7)
+          WRITE(3,*) 'pre resen 1', (Dtime(i),i=5,7)
           CALL RESEN(A(LSK),TT10,MAXA,JEDN,1)
          CALL DATE_AND_TIME(VALUES=Dtime)
-         WRITE(*,*) 'posle resen 1', (Dtime(i),i=5,7)
+         WRITE(3,*) 'posle resen 1', (Dtime(i),i=5,7)
         ENDIF
         ENDIF
-
+       if(myid.ne.0) goto 4567
        TOL=1.0D-7
 C=======================================================================
          CALL DATE_AND_TIME(VALUES=Dtime)
-         WRITE(*,*) 'vreme pre pisanja desne strane', (Dtime(i),i=5,7)
-
+         WRITE(3,*) 'vreme pre pisanja desne strane', (Dtime(i),i=5,7)
+!         WRITE(3,*) 'NUMZAD'
+!         WRITE(3,*)  'Cvor, zad pot', NZAD(1,I),FK1
        DO 410 I=1,NUMZAD
 c       write(iizlaz,*)'fk1=',fk1
 c       do ii=1,2
 c        write(iizlaz,*)TABF(1,1,Ii),TABF(2,1,Ii)
 c       enddo
         CALL TIMFUN (TABF,FK1,VVREME,ITFMAX(NZAD(3,I)),NZAD(3,I))
-       IF(NZAD(2,I).EQ.6.AND.CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+        POTZADC(I)=FK1
+       IF(NZAD(2,I).EQ.6.AND.CORD(IOSA,NZAD(1,I)).GT.FK1) THEN
+         POTZADC(I)=0.0
+         GOTO 410
+       ENDIF
 !  za Grancarevo zavisnost na granicama modela
 !  desna obala
        IF(NZAD(2,I).EQ.7) Then
+!         WRITE(3,*)  '7, pre', NZAD(1,I),CORD(IOSA,NZAD(1,I)),FK1
         FK1=301.0+0.332*FK1
-        if(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+!        WRITE(3,*)  '7, posle',NZAD(1,I),CORD(IOSA,NZAD(1,I)),FK1
+        POTZADC(I)=FK1
+        if(CORD(IOSA,NZAD(1,I)).GT.FK1) THEN
+         POTZADC(I)=0.0
+         GOTO 410
+        ENDIF
        ENDIF
-       IF(NZAD(2,I).EQ.-1) Then
-        SELECT CASE (NZAD(3,I))
-        CASE (1)
-           INTERPAXIS=1
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
-     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,1)
-        CASE (2)
-           INTERPAXIS=2
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
-     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,1)
-        CASE (3)
-           INTERPAXIS=3
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
-     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,1)
-        CASE DEFAULT
-        END SELECT
-        IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+       IF(NZAD(2,I).EQ.-2) Then
+!         WRITE(3,*)  '-2, pre', NZAD(1,I),CORD(IOSA,NZAD(1,I)),FK1
+        CALL PREDF_INTERP(I,NZAD,CORD,FK1,1)
+!         WRITE(3,*)  '-2,posle',NZAD(1,I),CORD(IOSA,NZAD(1,I)),FK1
+        POTZADC(I)=FK1
+        IF(CORD(IOSA,NZAD(1,I)).GT.FK1) THEN
+         POTZADC(I)=0.0
+         GOTO 410
+        ENDIF
        ENDIF
 !  leva obala - linearno
        IF(NZAD(2,I).EQ.0) Then
-        SELECT CASE (NZAD(3,I))
-        CASE (1)
-           INTERPAXIS=1
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
-     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,2)
-        CASE (2)
-           INTERPAXIS=2
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
-     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,2)
-        CASE (3)
-           INTERPAXIS=3
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
-     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,2)
-        CASE DEFAULT
-        END SELECT
-        IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 410
+!        WRITE(3,*)  '0, pre', NZAD(1,I),CORD(IOSA,NZAD(1,I)),FK1
+        CALL PREDF_INTERP(I,NZAD,CORD,FK1,2)
+!         WRITE(3,*)  '0,posle',NZAD(1,I),CORD(IOSA,NZAD(1,I)),FK1
+        POTZADC(I)=FK1
+        IF(CORD(IOSA,NZAD(1,I)).GT.FK1) THEN
+         POTZADC(I)=0.0
+         GOTO 410
+        ENDIF
        ENDIF
 c       write(iizlaz,*)'fk1=',fk1, vvreme,ITFMAX(NZAD(3,I)),NZAD(3,I)
 c       do ii=1,2
@@ -1048,6 +982,8 @@ C STRUJANJE NESTACIONARNO
 C===========================================================================
 C KONSTANTNI POTENCIJALI
         IF( (NZAD(2,I).EQ.1.OR.NZAD(2,I).EQ.6.OR.
+     &        NZAD(2,I).EQ.7.OR.NZAD(2,I).EQ.0.OR.
+     &        NZAD(2,I).EQ.-2.OR.
      &        (NZAD(2,I).EQ.3.AND.KKORAK.EQ.1))
      &        .AND.(ITER.EQ.0).AND.(ID(1,NZAD(1,I)).GT.0)) THEN
 cz oduzimanje zadate vrednosti od prethodno izracunate             
@@ -1058,7 +994,6 @@ C ZPREMINSKI IZVOR, PONOR
        IF ( (ID(1,NZAD(1,I)).GT.0) .AND. (NZAD(2,I).EQ.5)) THEN
           SILE(ID(1,NZAD(1,I)))=ZADVRE(I)*FK1
        ENDIF
-
 cz ovo ima smisla kod izcurivanja na slobodnoj povrsini (PROVERI USLOVE?)
       IF ((KKORAK.EQ.1).AND.(NZAD(2,I).EQ.-1).AND.(INDFS.EQ.1)) 
      1      SILE(ID(1,NZAD(1,I)))=1.0D35*CORD(IOSA,NZAD(1,I))
@@ -1080,7 +1015,9 @@ C KADA JE STRUJANJE STACIONARNO
 C
 C  ZA VDP TREBA OVAKO
 C
-        IF (NZAD(2,I).eq.1.OR.NZAD(2,I).EQ.6) THEN
+        IF (NZAD(2,I).eq.1.OR.NZAD(2,I).EQ.6.OR.
+     &        NZAD(2,I).EQ.7.OR.NZAD(2,I).EQ.0.OR.
+     &        NZAD(2,I).EQ.-2) THEN
          IF ( (ID(1,NZAD(1,I)).GT.0) .AND. (ITER.EQ.0) ) THEN
           SILE(ID(1,NZAD(1,I)))=1.0D35*ZADVRE(I)*FK1
 c         ELSE 
@@ -1098,10 +1035,12 @@ C===========================================================================
        ENDIF
   410  CONTINUE
          CALL DATE_AND_TIME(VALUES=Dtime)
-         WRITE(*,*) 'vreme pre presen,2', (Dtime(i),i=5,7)
+         WRITE(3,*) 'vreme pre presen,2', (Dtime(i),i=5,7)
 
 c         call wrr(SILE,JEDN,'s-p')
-      CALL RESEN(A(LSK),SILE,MAXA,JEDN,2)
+ 4567   CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+        CALL RESEN(A(LSK),SILE,MAXA,JEDN,2)
+        IF (myid.ne.0) goto 2346
 c         call wrr(SILE,JEDN,'s-k')
 c     OVDE UCITATI RESENJA SA DISKA U VEKTOR SILE
 c
@@ -1120,7 +1059,7 @@ C
       ENDIF
 
          CALL DATE_AND_TIME(VALUES=Dtime)
-         WRITE(*,*) 'vreme posle presen,2', (Dtime(i),i=5,7)
+         WRITE(3,*) 'vreme posle presen,2', (Dtime(i),i=5,7)
 C
            DO 440 I=1,JEDN
                 TT1(I)=TT1(I)+SILE(I)
@@ -1134,6 +1073,10 @@ C
 C
       CALL KONVTF(TT1,SILE,KONVV2,1,ID,ITER)
 C
+2346  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(KONVV2,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(MAXIT,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+
         IF (KKORAK.GT.0) THEN
 C
 C         CALL CKONV1(ICUR,TT1,CORD,ID,KONV1,UBRZ)
@@ -1147,12 +1090,14 @@ cz          if(nasilu.eq.0) then
             WRITE(IIZLAZ,*)'ITER=',ITER
             GO TO 100
           ENDIF
-          endif
+         ENDIF
+        
+        IF (myid.ne.0) goto 2345
 
         IF ((NJUTN.NE.0).AND.(INDOPT.EQ.0)) RETURN
 
  491     CALL DATE_AND_TIME(VALUES=Dtime)
-         WRITE(*,*) 'vreme pre racunanja gradijenta', (Dtime(i),i=5,7)
+         WRITE(3,*) 'vreme pre racunanja gradijenta', (Dtime(i),i=5,7)
 C======================================================================= 
 C RACUNANJE GRADIJENTA POTENCIJALA, BRZINA I ZAPREMINSKIH SILA
 C=======================================================================
@@ -1188,9 +1133,9 @@ C
       IF (NEMA.GT.0) GOTO 500
  
       CALL CLEARD(TT21,NDIM)
-      CALL PREB(TT21,TT1,ID,NEL,NBREL)
+      CALL PREB(TT21,TT1,NBREL)
       CALL CLEARD(TT210,NDIM)
-      CALL PREB(TT210,TT10,ID,NEL,NBREL)
+      CALL PREB(TT210,TT10,NBREL)
 C
       DO KLM=1,NDIMEL
        CK(1,KLM)=CORD(1,NEL(KLM,NBREL))
@@ -1226,6 +1171,7 @@ C INDIKATOR NJUTN-KOTESOVE INTEGRACIJE (0-NE,1-DA)
           IBRKT2=1
           IBRKT1=3
         ENDIF
+!         write(*,*) 'pre petlje po gausovim tackama, NBREL',NBREL
         DO  320 I=1,IBRKT1
         DO  320 J=1,IBRKT2
         DO  320 K=1,IBRKT2
@@ -1287,12 +1233,12 @@ C OKVASENOST U GAUS TACKI
         PR=0.D0
         DO II=1,NDIMEL
            PR=PR+H(II)*(TT21(II)-CORD(IOSA,NEL(II,NBREL)))
-       ENDDO
+        ENDDO
         OKVAS=0.
         IF(PR.GT.0.D0) OKVAS=1.
 c porni pritisak u gaus tacki
-        porni=pr*gama
-        IF(PR.GT.0.D0) PORNIEL(NBREL,NGAUS)=porni
+        PORNI=PR*GAMA
+        IF(PR.GT.0.D0) PORNIEL(NBREL,NGAUS)=PORNI
 C      write(iizlaz,*)NBREL,NGAUS,PORNIEL(NBREL,NGAUS)
 C=======================================================================
 C RACUNANJE GRADIJENTA POTENCIJALA:
@@ -1506,14 +1452,15 @@ C FILTRACIONE SILE U CVOROVIMA
 C======================================================================= 
  500  CONTINUE
 C
-C
 C======================================================================= 
  480   CALL PRKONT1(TT1,ID,UBRZ,CORD,NZAD,IOSA,IVECT,ZADVRE,KOJK)
 C========================================================================
 C RACUNANJE PROTOKA DUZ KONTURE UNUTAR MREZE
 C
+!          write(*,*) 'pre RKON3V'
+!        WRITE(*,*) 'pre racunanja protoka kroz kont'
       IF (NKONT.GT.0) THEN
-        CALL RKON3V(VECTJ,KONT,CORD,VG,KKORAK)
+        CALL RKON3V(VECTJ,KONT,VG,KKORAK,ISNUMER)
       ENDIF
 C
 C RACUNANJE PROTOKA DUZ KONTURE UNUTAR MREZE
@@ -1524,8 +1471,9 @@ C
 !       ENDIF
 C
 C
-       CALL DATE_AND_TIME(VALUES=Dtime)
-       WRITE(*,*) 'vreme pre stampanja', (Dtime(i),i=5,7)
+      CALL DATE_AND_TIME(VALUES=Dtime)
+      WRITE(*,*) 'vreme pre stampanja', (Dtime(i),i=5,7)
+      WRITE(3,*) 'vreme pre stampanja', (Dtime(i),i=5,7)
       WRITE(IIZLAZ,*)'PERIOD NUMBER,KKORAK ',NNPER, KKORAK         
       WRITE(*,*)'PERIOD NUMBER,KKORAK ',NNPER, KKORAK         
       IF (KKORAK.GT.0) THEN
@@ -1554,7 +1502,7 @@ C
 !      1            KOTES,IDJSTAMP1,NP3D1)
 !         IF (INDSC.EQ.0) THEN
 !       CALL STAG3D(TT1,ID,NASLOV,VVREME,KKORAK,1,NPT,18,0,NET,NEL,
-!      1            KORAK,VECTJ,CORD,GRADJN,NZAD,FZAPR)
+!      1            KORAK,VECTJ,GRADJN,NZAD,FZAPR)
 !         ENDIF
 !       ENDIF
 ! C
@@ -1562,70 +1510,110 @@ C
 ! 
 C stampanje potencijala
       IF (INDSC.EQ.0.OR.INDSC.EQ.3.OR.INDSC.EQ.4) THEN
-        CALL STAU09c(TT1,CORD,ID,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
+!        WRITE(*,*)'pre stau09c '         
+       CALL STAU09c(TT1,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
      1               NEL)
 C        CALL PRKONT1c(TT1,ID,UBRZ,CORD,NZAD,IOSA,IVECT,ZADVRE,KOJK)
 C stampanje dubine vode
 C       CALL STAU09c(TT1,CORD,ID,NPT,49,11,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
 C stampa rezultata u neu za sve cvorove
-       CALL STAS09(TT1,CORD,ID,NPT,49,10,1,KKORAK,NZAD,NUMZAD,KONT)
-       CALL STAU09(TT1,CORD,ID,NPT,49,9,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
-       CALL STAU09(TT1,CORD,ID,NPT,49,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
-       CALL STAU09(TT1,CORD,ID,NPT,49,11,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
-      CALL STAU09(VECTJ,CORD,ID,NPT,49,41,3,KKORAK,NZAD,NUMZAD,KONT,TT1)
-       CALL STAU09(GRADJN,CORD,ID,NPT,49,51,3,KKORAK,NZAD,NUMZAD,KONT,
-     1            TT1)
-      CALL STAU09(FZAPR,CORD,ID,NPT,49,61,3,KKORAK,NZAD,NUMZAD,KONT,TT1)
+!         WRITE(*,*)'pre STAS09 10 '         
+        CALL STAS09(TT1,NPT,49,10,1,KKORAK,NZAD,NUMZAD,KONT,ISNUMER)
+!         WRITE(*,*)'pre STAU09 9 '         
+       CALL STAU09(TT1,NPT,49,9,1,KKORAK,NZAD,NUMZAD,KONT,TT1,ISNUMER)
+!         WRITE(*,*)'pre STAU09 19 '         
+       CALL STAU09(TT1,NPT,49,19,1,KKORAK,NZAD,NUMZAD,KONT,TT1,ISNUMER)
+!         WRITE(*,*)'pre STAU09 1 '         
+       CALL STAU09(TT1,NPT,49,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,ISNUMER)
+!         WRITE(*,*)'pre STAU09 11 '         
+       CALL STAU09(TT1,NPT,49,11,1,KKORAK,NZAD,NUMZAD,KONT,TT1,ISNUMER)
+!         WRITE(*,*)'pre STAU09 41 '         
+       CALL STAU09(VECTJ,NPT,49,41,3,KKORAK,NZAD,NUMZAD,KONT,TT1,
+     1             ISNUMER)
+!         WRITE(*,*)'pre STAU09 51 '         
+       CALL STAU09(GRADJN,NPT,49,51,3,KKORAK,NZAD,NUMZAD,KONT,
+     1            TT1,ISNUMER)
+!         WRITE(*,*)'pre STAU09 61 '         
+      CALL STAU09(FZAPR,NPT,49,61,3,KKORAK,NZAD,NUMZAD,KONT,TT1)
 C stampanje pornih pritisaka 
 !!! PREPRAVITI STAU35 da radi sa svim tipovima elemenata i onda odkomentarisati
-       CALL STAU35(PORNIEL,KKORAK)
+!         WRITE(*,*)'pre STAU35 '         
+        CALL STAU35(PORNIEL,KKORAK,ISNUMER)
 c stampanje zapreminskih sila
 C stampanje rezultata u svim cvorovima
-      CALL IZLL3D(ID,TT1,KKORAK,VECTJ,QUK,QUM,VVREME,FZAPR,VG,GG,
-     1            KOTES,IDJSTAMP1,NP3D1)
+!        WRITE(*,*)'pre IZLL3D '         
+!       CALL IZLL3D(TT1,KKORAK,VECTJ,QUK,QUM,VVREME,FZAPR,VG,GG,
       ENDIF
+      CALL IZLL3D(TT1,KKORAK,VECTJ,VVREME,FZAPR,VG,GG,
+     1            KOTES,ISNUMER)
         IF (INDSC.EQ.0) THEN
-      CALL STAG3D(TT1,ID,NASLOV,VVREME,KKORAK,1,NPT,18,0,NET,NEL,
-     1            KORAK,VECTJ,CORD,GRADJN,NZAD,FZAPR)
+!         WRITE(*,*)'pre STAG3D '         
+      CALL STAG3D(TT1,NASLOV,VVREME,KKORAK,1,NPT,18,0,NET,
+     1            KORAK,VECTJ,GRADJN,NZAD,FZAPR,ISNUMER)
         ENDIF
-      IF (INDSC.EQ.1.OR.INDSC.EQ.3) THEN
-        CALL STAU09c(TT1,CORD,ID,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
-     1               NEL)
-      ENDIF
-c STAMPANJE REZULTATA ZA DODATNE TACKE - CRTANJE      
+!       IF (INDSC.EQ.1.OR.INDSC.EQ.3) THEN
+!          CALL STAU09c(TT1,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
+!      1               ISNUMER)
+!       ENDIF
+! C STAMPANJE REZULTATA ZA pijezometre     
       IF(INDSC.EQ.2.OR.INDSC.EQ.4) THEN
-!         CALL STAU09CT(TT1,CORD,47,VVREME,KKORAK,NEL)
-         CALL STAU09CDPV(TT1,VECTJ,CORD,50,VVREME,KKORAK,NEL)
-!          CALL STAU09CDP(TT1,CORD,50,VVREME,KKORAK,NEL)
-!          CALL STAU09CDV(VECTJ,CORD,50,VVREME,KKORAK,NEL)
-!         CALL STAU09CTPP(PORNIEL,CORD,47,VVREME,KKORAK,NEL)
+!         WRITE(*,*)'pre STAU09CT '         
+          CALL STAU09CT(TT1,47,VVREME,KKORAK,ISNUMER)
+! !        WRITE(*,*)'pre STAU09CDPV '   
+! !  uradi slobodnu numeraciju ???
+!          CALL STAU09CDPV(TT1,VECTJ,50,VVREME,KKORAK,ISNUMER)
+! !          CALL STAU09CDP(TT1,CORD,50,VVREME,KKORAK,NEL)
+! !          CALL STAU09CDV(VECTJ,CORD,50,VVREME,KKORAK,NEL)
+! !         CALL STAU09CTPP(PORNIEL,CORD,47,VVREME,KKORAK,NEL)
+        ENDIF
       ENDIF
+! Stampanje rezultata u presecima
+!  prvo se ucitavaju preseci pa stampaju rezultati za svaki presek
+      IF(ISPRESEK.GT.0) THEN
+         write(*,*) "stampanje rezultata preseka"
+         CALL STAMPPRESEKNEU(TT1,VECTJ,
+     +       VREME,VVREME,KKORAK,ISNUMER)
+!         CLOSE(250)
+!        ENDDO
+      ELSEIF(ISPRESEK.EQ.-1) THEN
+         CALL STAMPPRESEKNEU(TT1,VECTJ,
+     +       VREME,VVREME,KKORAK,ISNUMER)
       ENDIF
-! 
+      
 ! 
       IF(NXNASTRAN.EQ.1) RETURN
 C
       KKORAK=KKORAK+1
-c uslova da sledeci korak u tom periodu ne postoji i da ide na sledeci period
-      IF (DABS(VREME(NNPER,KORAK+1)).LT.1.D-10) THEN
+C uslova da sledeci korak u tom periodu ne postoji i da ide na sledeci period
+ 2345 CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+      VRNPKOR=DABS(VREME(NNPER,KORAK+1))
+      CALL MPI_BCAST(VRNPKOR,1,MPI_DOUBLE,0,MPI_COMM_WORLD,ierr)
+      IF (VRNPKOR.LT.1.D-10) THEN
         GOTO 600
       ELSE
 cz ide na sledeci korak      
         GOTO 35
       ENDIF
   600 CONTINUE
-      IF(NSTAC.EQ.1.AND.KKORAK.EQ.2) 
-     1  CALL IZBACI(TT1,CORD,ID,NPT,NEL,NET,IOSA,NDIM,IIZLAZ)
-       CALL DATE_AND_TIME(VALUES=Dtime)
-       WRITE(*,*) 'vreme posle stampanja', (Dtime(i),i=5,7)
+      if(myid.eq.0) then
+        IF(NSTAC.EQ.1.AND.KKORAK.EQ.2) 
+     1    CALL IZBACI(TT1,CORD,ID,NPT,NEL,NET,IOSA,NDIM,IIZLAZ)
+        CALL DATE_AND_TIME(VALUES=Dtime)
+        WRITE(*,*) 'vreme posle stampanja', (Dtime(i),i=5,7)
+        WRITE(3,*) 'vreme posle stampanja', (Dtime(i),i=5,7)
+      endif 
+      CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
       RETURN      
       END
 C=======================================================================
 C=======================================================================
-      SUBROUTINE IZLL3D(ID,TT1,KORAK,VECTJ,QUK,QUM,VVREME,FZAPR,VG,GG,
-     1                  KOTES,IDJSTAMP1,NP3D1)
+!       SUBROUTINE IZLL3D(TT1,KORAK,VECTJ,QUK,QUM,VVREME,FZAPR,VG,GG,
+      SUBROUTINE IZLL3D(TT1,KORAK,VECTJ,VVREME,FZAPR,VG,GG,
+     1                  KOTES,ISNUMBER)
+      USE NODES
       USE ELEMENTS
       USE KONTURE
+      USE ppr
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /NDESUK/ NDES,IDPRIT,IFORM
@@ -1640,11 +1628,12 @@ C=======================================================================
       COMMON /DODAT/ NDIMM
       COMMON /ICITANJE/INPT
       COMMON /PRIKAZ/ INDSC,IZPOT
-      COMMON /DJERDAP/ IDJERDAP
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
 
-      DIMENSION D4(4),TT1(*),VECTJ(3,*),ID(1,*),N4(4)
+      DIMENSION D4(4),TT1(*),VECTJ(3,*),N4(4)
       DIMENSION FZAPR(3,*),NRED(8),NREDK(8),NRED1(3)
-      DIMENSION VG(3,NET,*),GG(3,NET,*),QUK(1000),QUM(1000),NREDT(4)
+!       DIMENSION VG(3,NET,*),GG(3,NET,*),QUK(1000),QUM(1000),NREDT(4)
+      DIMENSION VG(3,NET,*),GG(3,NET,*),NREDT(4)
       DIMENSION NREDT10(10),VGT(3),NRED26(6),NRED28(8)
       DATA NRED/8,4,2,6,7,3,1,5/  
       DATA NREDK/27,9,3,21,25,7,1,19/
@@ -1653,9 +1642,10 @@ C=======================================================================
       DATA NRED28/1,2,3,4,12,23,34,41/
       DATA NREDT/1,2,3,4/
       DATA NREDT10/1,2,3,4,12,23,13,14,24,34/
-      DIMENSION IDJSTAMP1(5,*),NP3D1(*)
+      DIMENSION NP3D1(18)
 C
       if (indsc.eq.0) then
+!       write(*,*) "stampanje potencijala"
 C      
 CS  POTENCIJAL U CVOROVIMA 
 CE  NODE POTENTIAL 
@@ -1670,7 +1660,11 @@ C
    20 DO 50 I=1,4
       KG = KG +1
       IF(KG.GT.NPT) GO TO 100
-      N4(I) = KG
+      IF(ISNUMBER.EQ.0) THEN
+        N4(I) = KG 
+      ELSE
+        N4(I) = NCVEL(KG)
+      ENDIF
       JJEDN=ID(1,KG)
       IF(JJEDN.EQ.0) THEN
         D4(I) = 0.
@@ -1702,16 +1696,20 @@ C
       IF(ISRPS.EQ.1)
      1WRITE(IIZLAZ,6028)
 C
-CS  GUSTINE STRUJE U PRAVCU X1     
+CS  BRZINA U PRAVCU X1     
 CE  CURRENT DESNITIES IN DIRECTION X1
 C
 
       KG = 0
   620 DO 650 I=1,4
-      KG = KG +1
-      IF(KG.GT.NPT) GO TO 1600
-      N4(I) = KG
-         D4(I) = VECTJ(1,KG)
+       KG = KG +1
+       IF(KG.GT.NPT) GO TO 1600
+       IF(ISNUMBER.EQ.0) THEN
+         N4(I) = KG 
+       ELSE
+         N4(I) = NCVEL(KG)
+       ENDIF
+       D4(I) = VECTJ(1,KG)
   650 CONTINUE
 C
  1600 I = I - 1
@@ -1737,16 +1735,20 @@ C
       IF(ISRPS.EQ.1)
      1WRITE(IIZLAZ,6039)
 C
-CS  GUSTINE STRUJE U PRAVCU X2     
+CS  Brzina U PRAVCU X2     
 CE  CURRENT DESNITIES IN DIRECTION X2
 C
 
       KG = 0
   720 DO 750 I=1,4
-      KG = KG +1
-      IF(KG.GT.NPT) GO TO 1700
-      N4(I) = KG
-         D4(I) = VECTJ(2,KG)
+       KG = KG +1
+       IF(KG.GT.NPT) GO TO 1700
+       IF(ISNUMBER.EQ.0) THEN
+         N4(I) = KG 
+       ELSE
+         N4(I) = NCVEL(KG)
+       ENDIF
+       D4(I) = VECTJ(2,KG)
   750 CONTINUE
 C
  1700 I = I - 1
@@ -1772,16 +1774,20 @@ C
       IF(ISRPS.EQ.1)
      1WRITE(IIZLAZ,6049)
 C
-CS  GUSTINE STRUJE U PRAVCU X3     
+CS  BRZINA U PRAVCU X3     
 CE  CURRENT DESNITIES IN DIRECTION X3
 C
 
       KG = 0
   820 DO 850 I=1,4
-      KG = KG +1
-      IF(KG.GT.NPT) GO TO 1800
-      N4(I) = KG
-         D4(I) = VECTJ(3,KG)
+       KG = KG +1
+       IF(KG.GT.NPT) GO TO 1800
+       IF(ISNUMBER.EQ.0) THEN
+         N4(I) = KG 
+       ELSE
+         N4(I) = NCVEL(KG)
+       ENDIF
+       D4(I) = VECTJ(3,KG)
   850 CONTINUE
 C
  1800 I = I - 1
@@ -1801,6 +1807,7 @@ C
   877 IF(KG.LT.NPT) THEN
       GO TO 820
       ENDIF
+!       write(*,*) "stampanje brzina"
 
 C
 CS  BRZINE
@@ -1820,9 +1827,17 @@ C
           NTIMES=10
         ENDIF
         NDIMEL=elemtip(I)-NTIMES*NTYPE
-         WRITE(IIZLAZ,5000) I
+        IF(ISNUMBER.EQ.0) THEN
+          WRITE(IIZLAZ,5000) I
+        ELSE
+          WRITE(IIZLAZ,5000) MCVEL(I)
+        ENDIF
        DO J=1,NDIMEL
-         NC=NEL(J,I)
+         IF(ISNUMBER.EQ.0) THEN
+           NC=NEL(J,I)
+         ELSE
+           NC=NCVEL(NEL(J,I))
+         ENDIF
          NG=NRED(J)
          SELECT CASE(elemtip(I))
           CASE(12:13)
@@ -1865,6 +1880,7 @@ C
       ENDIF
 C
 CS  GRADIJENTI
+!       write(*,*) "stampanje gradijenata"
 C
       IF(ISRPS.EQ.0)
      1WRITE(IIZLAZ,2069)
@@ -1880,9 +1896,17 @@ C
           NTIMES=10
         ENDIF
         NDIMEL=elemtip(I)-NTIMES*NTYPE
-         WRITE(IIZLAZ,5000) I
+        IF(ISNUMBER.EQ.0) THEN
+          WRITE(IIZLAZ,5000) I
+        ELSE
+          WRITE(IIZLAZ,5000) MCVEL(I)
+        ENDIF
         DO J=1,NDIMEL
-         NC=NEL(J,I)
+         IF(ISNUMBER.EQ.0) THEN
+           NC=NEL(J,I)
+         ELSE
+           NC=NCVEL(NEL(J,I))
+         ENDIF
          NG=NRED(J)
          SELECT CASE(elemtip(I))
           CASE(12:13)
@@ -1925,6 +1949,7 @@ C
       ENDIF
 c
       endif      
+!       write(*,*) "stampanje zap sila"
 C
 CS  ZAPREMINSKE SILE
 CE  BODY FORCES
@@ -1950,31 +1975,63 @@ C	WRITE(25,*)'C  N,    FX,         FY,      FZ'
 ! 	        ENDIF
 ! 	     ENDIF
 ! 	    ENDDO
-           IF(IDJERDAP.EQ.1) THEN
+            CALL ICLEAR(NP3D1,18)
+            write(*,*)"izl, IDJERDAP", IDJERDAP
+           IF(IDJERDAP.GE.1) THEN
+C   podprogram za citanje cvorova u kojima se stampaju filtracione sile
+             II=1
+             CALL DJERDAPREADT(NP3D1,ISNUMBER,II)
              IFILE=105
              DO IK=1,1
-               IFILE=IFILE+1
+               IFILE=IFILE+IDJERDAP
 !                do ii=1,2
 !                	faktor=ii/2.0
                   faktor=1
                 WRITE(IFILE,5017) NP3D1(IK)
-                DO NN=1,NPT
-	         IF(IDJSTAMP1(IK,NN).EQ.IK) THEN
-! 	           IF(INPT.EQ.1) THEN
-                WRITE(IFILE,5017) NN,(FZAPR(KK,NN)*faktor,KK=1,3)
-! 	           ELSE
-!                 WRITE(IFILE,5007) NN,(FZAPR(KK,NN),KK=1,3)
-! 	           ENDIF
-	         ENDIF 
-	        ENDDO
-! 	       enddo
+                DO NN=1,NP3D1(IK)
+                IF(ISNUMBER.EQ.0) THEN
+                WRITE(IFILE,5017) IDJSTAMP1(IK,NN),
+!      1          (FZAPR(KK,NN)*faktor,KK=1,3)
+     1          (FZAPR(KK,IDJSTAMP1(IK,NN))*faktor,KK=1,3)
+                ELSE
+                WRITE(IFILE,5017) NCVEL(IDJSTAMP1(IK,NN)),
+     1          (FZAPR(KK,IDJSTAMP1(IK,NN))*faktor,KK=1,3)
+                ENDIF
+               ENDDO
              ENDDO
+           ELSEIF(IDJERDAP.EQ.-1)THEN
+             DO II=1,18
+               CALL DJERDAPREADT(NP3D1,ISNUMBER,II)
+             IIDJERDAP=II 
+            write(*,*)"IIDJERDAP",IIDJERDAP,NP3D1(1)
+             IFILE=105
+             DO IK=1,1
+               IFILE=IFILE+IIDJERDAP
+                  faktor=1
+                WRITE(IFILE,5017) NP3D1(IK)
+               DO NN=1,NP3D1(IK)
+                IF(ISNUMBER.EQ.0) THEN
+                WRITE(IFILE,5017) IDJSTAMP1(IK,NN),
+!      1          (FZAPR(KK,NN)*faktor,KK=1,3)
+     1          (FZAPR(KK,IDJSTAMP1(IK,NN))*faktor,KK=1,3)
+                ELSE
+                WRITE(IFILE,5017) NCVEL(IDJSTAMP1(IK,NN)),
+     1          (FZAPR(KK,IDJSTAMP1(IK,NN))*faktor,KK=1,3)
+                ENDIF
+	       ENDDO
+             ENDDO
+            ENDDO
+!  stampa za sve cvorove u jedan fajl           
            ELSE
 !             do ii=1,2
               faktor=1
              DO NN=1,NPT
 !                IF(INPT.EQ.1) THEN
-             WRITE(25,5017) NN,(FZAPR(KK,NN)*faktor,KK=1,3)
+               IF(ISNUMBER.EQ.0) THEN
+                WRITE(25,5017) NN,(FZAPR(KK,NN)*faktor,KK=1,3)
+               ELSE
+            WRITE(25,5017) NCVEL(NN),(FZAPR(KK,NN)*faktor,KK=1,3)
+               ENDIF
 ! 	        ELSE
 !              WRITE(25,5007) NN,(FZAPR(KK,NN),KK=1,3)
 ! 	        ENDIF
@@ -2003,25 +2060,40 @@ C
 CS  PROTOK KROZ KONTURU     
 CE  CURRENT FLUX WITHIN CONTOUR
 C
-      IF(NKONT.GT.0) THEN
-       QK=0.
-       QM=0.
-       DO L=1,NKONT
+!       write(*,*) "stampanje protoka kroz kont"
+!       write(*,*) 'INDSC,NKONT', INDSC,NKONT
+      IF(INDSC.EQ.0) THEN
+        IF(NKONT.GT.0) THEN
+         QK=0.
+         QM=0.
+         DO L=1,NKONT
+!        write(*,*)"l,QUK(L),QUM(L)", L,QUK(L),QUM(L)
           QK=QK+QUK(L)
           QM=QM+QUM(L) 
-       ENDDO
-       IF(INDSC.EQ.0) THEN
+        ENDDO
+        ENDIF
         WRITE(IIZLAZ,7023) VVREME
+!         write(*,*)"NKONT", NKONT
         DO L=1,NKONT
+         IF(ISNUMBER.EQ.0) THEN
          WRITE(IIZLAZ,5007) L,QUK(L),QUM(L),QUK(L)+QUM(L)
+         ELSEIF(ISNUMBER.EQ.1) THEN
+         LI=LINSN(L)
+!          write(*,*)"L,LI", L,LI
+         WRITE(IIZLAZ,5007) LI,QUK(L),QUM(L),QUK(L)+QUM(L)
+         ENDIF
         ENDDO
         WRITE(IIZLAZ,5008) QK,QM,QK+QM
         WRITE(21,7023) VVREME
         DO L=1,NKONT
+         IF(ISNUMBER.EQ.0) THEN
          WRITE(21,5007) L,QUK(L),QUM(L),QUK(L)+QUM(L)
+         ELSEIF(ISNUMBER.EQ.1) THEN
+         LI=LINSN(L)
+         WRITE(21,5007) LI,QUK(L),QUM(L),QUK(L)+QUM(L)
+         ENDIF
         ENDDO 
         WRITE(21,5008) QK,QM,QK+QM
-       ENDIF
       ENDIF
 C
       RETURN
@@ -2079,7 +2151,7 @@ C
 C RACUNANJE PROTOKA DUZ KONTURE ZA 3D ELEMENTE
 C
 C=========================================================================
-      SUBROUTINE RKONT3(TT1,ID,KONT,AKONST,QUK,QUM,CORD,KOR)
+      SUBROUTINE RKONT3(TT1,ID,KONT,AKONST,CORD,KOR)
       USE ELEMENTS
       USE KONTURE
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
@@ -2099,7 +2171,7 @@ C
 C
       DIMENSION KONT(9,MAXLIN,*),ID(1,*)
       DIMENSION AFIFI(21,21),AM1(21,21),AK(21,21),TT1(*),CORD(3,*)
-      DIMENSION AKONST(3,5,*),QPR(21),QUK(1000),QUM(1000)
+      DIMENSION AKONST(3,5,*),QPR(21)
       DIMENSION A12(3),A14(3),DN(3)
 C
 C*    BLOK ZA STAMPANJE PROTOKA PO ELEMENTIMA ZA GRAFIKU - PRIVREMENO
@@ -2335,7 +2407,8 @@ C
 C RACUNANJE PROTOKA DUZ KONTURE UNUTAR MREZE
 C
 C=========================================================================
-      SUBROUTINE RKON3V(VECTJ,KONT,CORD,VG,KOR)
+      SUBROUTINE RKON3V(VECTJ,KONT,VG,KOR,ISNUMER)
+      USE NODES
       USE ELEMENTS
       USE KONTURE
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
@@ -2353,8 +2426,9 @@ C
 C
       DIMENSION KONT(9,MAXLIN,*)
       DIMENSION VG(3,NET,*)
-      DIMENSION VECTJ(3,*),CORD(3,*)
-      DIMENSION QUK(1000),QUM(1000),NRED(10),NRED26(6),NRED28(8)
+      DIMENSION VECTJ(3,*)
+!       DIMENSION QUK(1000),QUM(1000),NRED(10),NRED26(6),NRED28(8)
+      DIMENSION NRED(10),NRED26(6),NRED28(8)
       DIMENSION NRED8(8),NRED1(3),NREDT4(4),NREDT10(10)
       DATA NRED8/8,4,2,6,7,3,1,5/
       DATA NRED1/2,1,12/
@@ -2399,10 +2473,12 @@ C
       DO 723 KK=1,NKONT
         QUK(KK)=0.D0
         QUM(KK)=0.D0
+!         write(*,*)'KK,LIN(KK)',KK,LIN(KK)
 C
 	DO 134 II=1,LIN(KK)
 C
           NBREL=KONT(1,II,KK)
+!            write(*,*)'KK,NBREL',KK,NBREL
           NMAT=NEL(NDIM+1,NBREL)
           NEMA=NEL(NDIM+2,NBREL)
           NLM=NLM+1
@@ -2691,14 +2767,26 @@ C
          QM=QM+QUM(L)
       ENDDO
        WRITE(IIZLAZ,*)' KONTURA, ULAZNI,      IZLAZNI,    UKUPNI PROTOK'
+!        WRITE(*,*) "NKONT",NKONT
       DO L=1,NKONT
+       IF(ISNUMER.EQ.0)THEN
        WRITE(IIZLAZ,5055) L,QUK(L),QUM(L),(QUK(L)+QUM(L))
+       ELSEIF(ISNUMER.EQ.1)THEN
+       LI=LINSN(L)
+!        WRITE(*,*) "L,LI",L,LI
+       WRITE(IIZLAZ,5055) LI,QUK(L),QUM(L),(QUK(L)+QUM(L))
+       ENDIF
       ENDDO
        WRITE(IIZLAZ,*)' SUMARNI  ULAZNI,      IZLAZNI,    UKUPNI PROTOK'
        WRITE(IIZLAZ,5056) QK,QM,QK+QM
        WRITE(21,*)' KONTURA, ULAZNI,      IZLAZNI,    UKUPNI PROTOK'
       DO L=1,NKONT
+       IF(ISNUMER.EQ.0)THEN
        WRITE(21,5055) L,QUK(L),QUM(L),(QUK(L)+QUM(L))
+       ELSEIF(ISNUMER.EQ.1)THEN
+       LI=LINSN(L)
+       WRITE(21,5055) LI,QUK(L),QUM(L),(QUK(L)+QUM(L))
+       ENDIF
       ENDDO
        WRITE(21,*)' SUMARNI  ULAZNI,      IZLAZNI,    UKUPNI PROTOK'
        WRITE(21,5056) QK,QM,QK+QM
@@ -2719,7 +2807,7 @@ C RACUNANJE PROTOKA DUZ KONTURE ZA 3D ELEMENTE - preko brzina / Sneza april 2013
 C
 C=========================================================================
 !       SUBROUTINE RKONT3V(VG,KONT,NEL,QUK,QUM,CORD,KOR)
-      SUBROUTINE RKONT3V(VG,KONT,QUK,QUM,CORD,KOR)
+      SUBROUTINE RKONT3V(VG,KONT,CORD,KOR)
       USE ELEMENTS
       USE KONTURE
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
@@ -2741,7 +2829,7 @@ C
 C      DIMENSION KONT(9,MAXLIN,*),NEL(NDIMM,*)
       DIMENSION KONT(9,MAXLIN,*)
       DIMENSION VG(3,NET,*),CORD(3,*)
-      DIMENSION QUK(1000),QUM(1000),NRED(8)
+      DIMENSION NRED(8)
       DATA NRED/8,4,2,6,7,3,1,5/  
 C
 C*    BLOK ZA STAMPANJE PROTOKA PO ELEMENTIMA ZA GRAFIKU - PRIVREMENO
@@ -2884,6 +2972,7 @@ C ......................................................................
       if (.not.allocated(NZADC)) then 
         allocate(NZADC(NZADP),STAT=istat)
         CALL ICLEAR8(NZADC,NZADP)       
+!         CALL ICLEAR(NZADC,NZADP)       
         DO J = 1, nonzeros
           IF(rows(J).EQ.columns(J)) THEN
             DO I=1,NZADP
@@ -2900,6 +2989,9 @@ C ......................................................................
 
        DO 10 I=1,NZADP
          IF(IPAKT.NE.1) THEN
+! ! ! ! ! ! ! ! ! ! 
+!   PAKV
+! ! ! ! ! ! ! ! 
           CALL TIMFUN (TABF,FK1,VVREME,ITFMAX(NZAD(3,I)),NZAD(3,I))
           IF(NZAD(2,I).EQ.6.AND.CORD(IOSA,NZAD(1,I)).GT.FK1) goto 10
 !  za Grancarevo zavisnost na granicama modela
@@ -2909,47 +3001,57 @@ C ......................................................................
            if(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 10
           ENDIF
           IF(NZAD(2,I).EQ.-1) Then
-           SELECT CASE (NZAD(3,I))
-           CASE (1)
-            INTERPAXIS=1
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
-     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,1)
-           CASE (2)
-            INTERPAXIS=2
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
-     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,1)
-           CASE (3)
-            INTERPAXIS=3
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
-     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,1)
-           CASE DEFAULT
-           END SELECT
-           IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 10
+! C suborutine PREDF_INTERP pakv4.for           
+!           CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
+!      1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+!         CASE (2)
+!            INTERPAXIS=2
+!           CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
+!      1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+!         CASE (3)
+!            INTERPAXIS=3
+!           CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
+!      1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,1)
+!         CASE DEFAULT
+!         END SELECT
+            CALL PREDF_INTERP(I,NZAD,CORD,FK1,1)
+            IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 10
           ENDIF
-!  leva obala - linearno
+!  leva obala - linearno Grancarevo
           IF(NZAD(2,I).EQ.0) Then
-           SELECT CASE (NZAD(3,I))
-           CASE (1)
-            INTERPAXIS=1
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
-     1                  ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1,2)
-           CASE (2)
-            INTERPAXIS=2
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
-     1                  ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1,2)
-           CASE (3)
-            INTERPAXIS=3
-          CALL PREDF_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
-     1                  ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1,2)
-           CASE DEFAULT
-           END SELECT
+           CALL PREDF_INTERP(I,NZAD,CORD,FK1,2)
            IF(CORD(IOSA,NZAD(1,I)).GT.FK1) GOTO 10
           ENDIF
+! ! ! ! ! ! ! ! ! ! 
+!   PAKT
+! ! ! ! ! ! ! ! 
+!          ELSEIF (IPAKT.EQ.1) THEN
+!           IF(NZAD(2,I).NE.0) THEN
+!            CALL TIMFUN(TABF,FK1,VVREME,ITFMAX(NZAD(3,I)),NZAD(3,I))
+!           ELSE
+! !  Djerdap interpolacija zadatih temperatura na spoju beton/stena    
+!            IF(NZAD(3,I).EQ.1) THEN
+!              INTERPAXIS=1
+!              CALL PRED_INTERP(I,INTERPAXIS,NUMAXISPTSX,INTAXISPOINTX,
+!      1              ITFMAX,NZAD,XAXISPTCORD,CORD,TABF,VVREME,FK1)
+!            ENDIF
+!            IF(NZAD(3,I).EQ.2) THEN
+!              INTERPAXIS=2
+!              CALL PRED_INTERP(I,INTERPAXIS,NUMAXISPTSY,INTAXISPOINTY,
+!      1               ITFMAX,NZAD,YAXISPTCORD,CORD,TABF,VVREME,FK1)
+!            ENDIF
+!            IF(NZAD(3,I).EQ.3) THEN
+!              INTERPAXIS=3
+!              CALL PRED_INTERP(I,INTERPAXIS,NUMAXISPTSZ,INTAXISPOINTZ,
+!      1               ITFMAX,NZAD,ZAXISPTCORD,CORD,TABF,VVREME,FK1)
+!            ENDIF
+!           ENDIF
          ENDIF
+
          IF (NZAD(2,I).EQ.4.OR.NZAD(2,I).EQ.5) GOTO 10
          
          IF(NZADC(I).GT.0) stiff(NZADC(I)) = PENALTY_FACTOR
-
+!         WRITE(3,*)"zadlev",I,NZAD(1,I),NZADC(I),stiff(NZADC(I))
    10  CONTINUE
    
       RETURN
@@ -2958,12 +3060,13 @@ C ......................................................................
 C$DEBUG      
 C=========================================================================
       SUBROUTINE RACN3DT(TT1,SILE,
-     1ID,NZAD,ZADVRE,NGPSIL,MAXA,CORD,SKEF,SKEFN,
+     1NZAD,ZADVRE,NGPSIL,MAXA,SKEF,SKEFN,
      2FZAPR,VREME,TABF,TT10,UBRZ,UBRZ0,AK,
      3VECTJ,IVECT,POVSIL,GRADJN,
-     4ITFMAX,AKONST,NASLOV,ICUR,VG,GG,INDPT)
+     4ITFMAX,AKONST,NASLOV,ICUR,VG,GG,INDPT,ISNUMER)
       USE PPR
       USE STIFFNESS
+      USE NODES
       USE ELEMENTS
       USE PREDISCRIBED
       USE KONTURE
@@ -2975,6 +3078,7 @@ C=========================================================================
       INCLUDE 'mpif.h'
 c      COMMON A(17000)
 c      REAL A
+      COMMON /IME/ IME
       COMMON /TRENT3/ ZVHX(21),ZVHY(21),ZVHZ(21),CK(3,21),H(21),
      1 FS2,DETJS,DETJ,NBREL
       COMMON /KRITER/ IDOKL,MAXCUR
@@ -3014,21 +3118,22 @@ C
       COMMON /NXNAST/ NXNASTRAN
       COMMON /SOLVER/ ISOLVER
       COMMON /NELDIM/ NDIMEL
-      COMMON /DJERDAP/ IDJERDAP
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
       COMMON /ICITANJE/ INPT
       COMMON /STAMPAZT/ NPRINT
 C
       CHARACTER*80 NASLOV
-      DIMENSION TT1(*),SILE(*),ZADVRE(*),CORD(3,*)
+      DIMENSION TT1(*),SILE(*),ZADVRE(*)
       DIMENSION VG(3,NET,*),GG(3,NET,*)
       DIMENSION TT10(*),UBRZ(*),UBRZ0(*)
-      DIMENSION ID(1,*),NZAD(3,*),NGPSIL(12,*),MAXA(*)
+      DIMENSION NZAD(3,*),NGPSIL(12,*),MAXA(*)
+!       DIMENSION ID(1,*),NZAD(3,*),NGPSIL(12,*),MAXA(*),CORD(3,*)
       DIMENSION SKEF(NDES,*),AKONST(3,5,*),SKEFN(*)
       DIMENSION POVSIL(4,*),PR1(21),ITFMAX(*)
 C
 !       DIMENSION KONT(9,MAXLIN,*),KOJK(*)
 
-      DIMENSION TT21(44),TT210(44),QUK(1000),QUM(1000)
+      DIMENSION TT21(44),TT210(44)
       DIMENSION R(3,3),S(3,3),T(3,3),W(3,3)
       DIMENSION RK(3,3),SK(3,3),TK(3,3),WK(3,3)
       DIMENSION FZAPR(3,*),VECTJ(3,*),GRADJN(3,*)
@@ -3063,13 +3168,15 @@ C
       DIMENSION NDJEL(21),NP3D1(5)
       logical OLDNEWW
       integer Dtime(8)
+      CHARACTER*50 IME
+      CHARACTER*53 IZIPOCT
 
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
 
       IF (myid.ne.0) goto 1235
   
       if (.not.allocated(PORNIEL)) allocate(PORNIEL(NET,10),STAT=istat) 
-      if(.not.allocated(IDJSTAMP1))allocate(IDJSTAMP1(5,NPT),STAT=istat) 
+!       if(.not.allocated(IDJSTAMP1))allocate(IDJSTAMP1(1,NPT),STAT=istat) 
       IF(MAXSIL.GT.0) THEN
        if(.not.allocated(PFLUXEL))allocate(PFLUXEL(MAXSIL),STAT=istat) 
       ENDIF
@@ -3078,21 +3185,22 @@ C
        if(.not.allocated(TOKOLINEL))allocate(TOKOLINEL(MAXTQE),
      1       STAT=istat) 
       ENDIF
-      DO I=1,5
-        DO JJ=1,NPT
-          IDJSTAMP1(I,JJ)=0
-        ENDDO
-      ENDDO
+!       DO I=1,1
+!         DO JJ=1,NPT
+!           IDJSTAMP1(I,JJ)=0
+!         ENDDO
+!       ENDDO
 C
-       CALL ICLEAR(NP3D1,5)
+!        CALL ICLEAR(NP3D1,5)
 !       CALL ICLEAR(IDJSTAMP1,NPT)
 C      IDJERDAP=1
 !          write(*,*) 'IDJERDAP',IDJERDAP
-      IF(IDJERDAP.EQ.1)THEN
-C   program za citanje cvorova u kojima se stampaju filtracione sile
-              CALL DJERDAPREADT(IDJSTAMP1,NP3D1)
-C
-       ENDIF
+!       IF(IDJERDAP.GT.0)THEN
+! C   program za citanje cvorova u kojima se stampaju filtracione sile
+!  za Dejerdap se radi po lamelama pa uvek stampa temperature za cvrstocu
+!               CALL DJERDAPREADT(IDJSTAMP1,NP3D1,ISNUMER)
+! C
+!        ENDIF
 C INDIKATOR ZA OSU TEZINE - ne treba za pakt
 !  9998   IF (IOSA.EQ.0) IOSA=3
 
@@ -3109,7 +3217,7 @@ C
 C  INICIJALIZACIJA KONVERGENCIJE ZA LINIJU CURENJA
        KONV1=1  
 
-!        MAXCUR=0
+        MAXCUR=0
 !        IDOKL=0
 !        CALL INIDOK(NZAD,ICUR,CORD)
 
@@ -3187,10 +3295,14 @@ C indikator LINTE=0 - linearan proracun
       LINTE=0
 C=========================================================================
 c petlja po periodima
+1235  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(NPER,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
       DO 600 NNPER=1,NPER
+      
       KORAK=0
 c petlja po koracima
    35 KORAK=KORAK+1
+      if(myid.ne.0) goto 3456
 C
 C=========================================================================   
 C  RAD SA STACIONARNIM STANJEM U PRVOM KORAKU I NESTACIONARNIM U OSTALIM
@@ -3227,7 +3339,13 @@ C     ZADAVANJE POCETNE TEMPERATURE
              ENDDO
           ELSE
 C            UCITAVANJE TEMPERATURA KOJE CE BITI POCETNE
-               OPEN(99,FILE='ZIPOCT.UL',STATUS='OLD',FORM='UNFORMATTED',
+            IB=INDEX(IME,'.')
+            IF (IB.EQ.0) THEN
+             IZIPOCT=trim(IME) // '.UL'
+            ELSE
+             IZIPOCT=IME(1:IB-1)//'.UL'
+            ENDIF
+               OPEN(99,FILE=IZIPOCT,STATUS='OLD',FORM='UNFORMATTED',
      1              ACCESS='SEQUENTIAL')
              CALL POCETNET(TT10,NPT,99,1)
              CLOSE (99)		  
@@ -3535,12 +3653,14 @@ C proizvod I*n
                DO J=1,NDIMEL
                  IF(NGPSIL(K,JBRPS).EQ.NEL(J,NBREL)) THEN
 !   povrsinski fulks  j-na (1.30)                 
+!            RS2(J)=RS2(J)+HT(K-1,1)*FS2*WDTS*(-VNI)*RKOREKCIJA*TIME
            RS2(J)=RS2(J)+HT(K-1,1)*FS2*WDTS*(-VNI)*RKOREKCIJA
                  ENDIF
                ENDDO
              ENDDO
           ENDDO 
           PFLUXEL(JBRPS)=-FS2*VNI*RKOREKCIJA
+!           PFLUXEL(JBRPS)=-FS2*VNI*RKOREKCIJA*TIME
 !           write(IIZLAZ,*)'NBREL,FS2',NBREL,FS2,RKOREKCIJA,TIME
 !          write(IIZLAZ,*)'PFLUXEL',NGPSIL(1,JBRPS),PFLUXEL(JBRPS)
         ELSE
@@ -3711,7 +3831,9 @@ C ----------------------------------------
       IPROM=NELTOK(12,JBRPS)
 !       WRITE(3,*) "JBRPS,IPROM",JBRPS,IPROM
 !        WRITE(3,*) "JBRPS,NBREL",JBRPS,NELTOK(1,JBRPS)
-       FCONEL(JBRPS)=NELTOK(10,JBRPS)
+      FCONEL(JBRPS)=NELTOK(10,JBRPS)
+      TOKOLINEL(JBRPS)=NELTOK(11,JBRPS)
+!  IPROM = 3 proverava se da li element okvasen      
       IF(IPROM.EQ.1.OR.IPROM.EQ.3) THEN
         IVODE=NELTOK(10,JBRPS)/1000000
         IVRFH1=NELTOK(10,JBRPS)/1000-IVODE*1000
@@ -3722,24 +3844,24 @@ C ----------------------------------------
          IVRFTOK2=NELTOK(11,JBRPS)-IVRFTOK1*1000
         ELSE
          IVRFTOK1=NELTOK(11,JBRPS)
-         IVRFTOK2=0
+         IVRFTOK2=NELTOK(11,JBRPS)
         ENDIF
         IVRFVODE=WATER(3,IVODE)
         CALL TIMFUN (TABF,FWATER,VVREME,ITFMAX(IVRFVODE),IVRFVODE)
-        IF(HFACE(JBRPS).GT.FWATER.OR.IVRFTOK2.EQ.0) THEN
+!         IF(HFACE(JBRPS).GT.FWATER.OR.IVRFTOK2.EQ.0) THEN
+        IF(HFACE(JBRPS).GT.FWATER) THEN
             CALL TIMFUN (TABF,FK1TOK,VVREME,ITFMAX(IVRFTOK1),IVRFTOK1)
         ELSE
             CALL TIMFUN (TABF,FK1TOK,VVREME,ITFMAX(IVRFTOK2),IVRFTOK2)
         ENDIF
-       TOKOLINEL(JBRPS)=FK1TOK
 C zavisna voda - donja voda za Djerdap        
         IF(WATER(2,IVODE).NE.0) THEN
-            IPOM111=WATER(2,IVODE)
-            IVRFVODE_DEP=WATER(3,IPOM111)
+           IPOM111=WATER(2,IVODE)
+           IVRFVODE_DEP=WATER(3,IPOM111)
 !             WRITE(3,*) "IPOM111",IPOM111
 !              WRITE(3,*) "IVRFVODE_DEP",IVRFVODE_DEP
 !             IVRFVODE_DEP=WATER(3,WATER(2,IVODE))
-            CALL TIMFUN (TABF,FWATER_DEP,VVREME,ITFMAX(IVRFVODE_DEP),
+           CALL TIMFUN (TABF,FWATER_DEP,VVREME,ITFMAX(IVRFVODE_DEP),
      1       IVRFVODE_DEP)
         ENDIF
       ELSE
@@ -3761,7 +3883,7 @@ C zavisna voda - donja voda za Djerdap
             IVRFVODE_DEP=WATER(3,IPOM111)
 !              WRITE(3,*) "IPOM111",IPOM111
 !              WRITE(3,*) "IVRFVODE_DEP",IVRFVODE_DEP
-!             IVRFVODE_DEP=WATER(3,WATER(2,IVODE))
+            IVRFVODE_DEP=WATER(3,WATER(2,IVODE))
             CALL TIMFUN (TABF,FWATER_DEP,VVREME,ITFMAX(IVRFVODE_DEP),
      1       IVRFVODE_DEP)
           ENDIF
@@ -3771,17 +3893,17 @@ C zavisna voda - donja voda za Djerdap
       ENDIF
 !       WRITE(*,*) "pre racunanja bofanga"
 !         WRITE(3,*) "FK1TOK",FK1TOK
-!         WRITE(3,*) "FWATER,HFACE(JBRPS)",FWATER,HFACE(JBRPS)
 !       
 C Temperatura okoline je u funkciji vremena
 !       
       IF(IPROM.EQ.2.OR.IPROM.EQ.3.AND.HFACE(JBRPS).LE.FWATER) THEN
-!         IF(WATER(2,IVODE).EQ.0) THEN
-!           IDWATER=WATER(1,IVODE)
-!         ELSE
-!           IDWATER=WATER(2,IVODE)
-!         ENDIF
-       
+!  DJERDAP   
+!          IF(WATER(2,IVODE).EQ.0) THEN
+!            IDWATER=WATER(1,IVODE)
+!          ELSE
+!            IDWATER=WATER(2,IVODE)
+!          ENDIF
+!  DJERDAP -pod komentarom o u starijoj verziji    
 !         IDSENSOR(1)=0
 !         IDSENSOR(2)=0
 !         DISTSENSOR(1)=1.0D10
@@ -3803,33 +3925,39 @@ C Temperatura okoline je u funkciji vremena
         IVRFSENSOR=SENSOR(3,1)
         CALL TIMFUN (TABF,FSENSOR(1),VVREME,ITFMAX(IVRFSENSOR)
      1                   ,IVRFSENSOR)
-        IF (FWATER.GE.PREKIDNAFR) THEN
-           IVRFSENSOR=SENSOR(3,2)
-           HSENSOR2=HSENSOR(2)
-        ELSE
-           IVRFSENSOR=SENSOR(3,3)      
-           HSENSOR2=HSENSOR(3)
-           IF(FWATER.LT.350.0) THEN
-            write(*,*) 'nivo u akumulaciji ispod 350', FWATER
-            write(3,*) 'nivo u akumulaciji ispod 350', FWATER
-            ENDIF
-        ENDIF
+!  Grancarevo     
+!         IF (FWATER.GE.PREKIDNAFR) THEN
+!            IVRFSENSOR=SENSOR(3,2)
+!            HSENSOR2=HSENSOR(2)
+!         ELSE
+!            IVRFSENSOR=SENSOR(3,3)      
+!            HSENSOR2=HSENSOR(3)
+!            IF(FWATER.LT.350.0) THEN
+!             write(*,*) 'nivo u akumulaciji ispod 350', FWATER
+!             write(3,*) 'nivo u akumulaciji ispod 350', FWATER
+!             ENDIF
+!         ENDIF
+!  kraj Grancarevo
+        IVRFSENSOR=SENSOR(3,2)
         CALL TIMFUN (TABF,FSENSOR(2),VVREME,ITFMAX(IVRFSENSOR)
      1                   ,IVRFSENSOR)
-        CALL TIMFUN (TABF,FK1TOK,VVREME,ITFMAX(IVRFTOK1),IVRFTOK1)
+!         CALL TIMFUN (TABF,FK1TOK,VVREME,ITFMAX(IVRFTOK1),IVRFTOK1)
 !         WRITE(3,*) "IVODE,WATER(2,IVODE)",IVODE,WATER(2,IVODE)
         IF(WATER(2,IVODE).EQ.0) THEN
 !            WRITE(3,*) "FWATER,HSENSOR(1),HSENSOR(2),HFACE(JBRPS)",FWATER
 !      1            ,HSENSOR(1),HSENSOR(2),HFACE(JBRPS)
 !            WRITE(3,*) "FSENSOR(1),FSENSOR(2)",FSENSOR(1),FSENSOR(2)
+! CCCCCCCCCCCCCCCCCCCCCCCCCC
 !  DJERDAP
-!           CALL LININTGV(FWATER-HSENSOR(1),FWATER-HSENSOR(2),
-!      1     FSENSOR(1),FSENSOR(2),FK1TOK,
-!      2                          0,FWATER-HFACE(JBRPS))
-!  GRANCAREVO
-          CALL LININTGV(FWATER-HSENSOR(1),FWATER-HSENSOR2,
+!      SUBROUTINE LININTGV(Y1,Y2,TW1,TW2,TM,IND,Y)
+          CALL LININTGV(FWATER-HSENSOR(1),FWATER-HSENSOR(2),
      1     FSENSOR(1),FSENSOR(2),FK1TOK,
      2                          0,FWATER-HFACE(JBRPS))
+! CCCCCCCCCCCCCCCCCCCCCCCCCC
+!  GRANCAREVO
+!           CALL LININTGV(FWATER-HSENSOR(1),FWATER-HSENSOR2,
+!      1     FSENSOR(1),FSENSOR(2),FK1TOK,
+!      2                          0,FWATER-HFACE(JBRPS))
 !         WRITE(3,*) "FK1TOK,TBOFANG",FK1TOK,TBOFANG
 !             WRITE(3,*) "FK1TOK",FK1TOK
 C nema donje vode za Grancarevo
@@ -3842,7 +3970,7 @@ C nema donje vode za Grancarevo
           CALL LININTGV(FWATER_DEP-HSENSOR(1),FWATER_DEP-HSENSOR(2),
      1     FSENSOR(1),FSENSOR(2),FK1TOK,
      2                      1,0)
-!           CALL TEMP_DEMPENDANCE(FK1TOK,TBOFANG,CBOFANG)
+!            CALL TEMP_DEMPENDANCE(FK1TOK,TBOFANG,CBOFANG)
         ENDIF
       ENDIF
 !         if(nbrel.eq.2757)  WRITE(3,*) "nbrel,FK1TOK",nbrel,FK1TOK
@@ -3867,6 +3995,8 @@ C
 !       write(3,*) "IVRFH",IVRFH
 !       write(3,*) "IVRFTOK",IVRFTOK
 !       write(3,*) "FK1TOK",FK1TOK
+!          WRITE(3,*) "FWATER,HFACE,FK1TOK",NBREL,FWATER,
+!      1          HFACE(JBRPS),FK1TOK
       TOKOLINEL(JBRPS)=FK1TOK
       NUMGAU=IBRGT
 !  proveriti prelaznost za 1D element      
@@ -3886,6 +4016,7 @@ C odredjivanje koeficijenta prelaznosti HHP u zavisnosti od temperature
           IF(IPROM.EQ.1.AND.IPROM.EQ.3) THEN
             IF(HFACE(JBRPS).GT.FWATER) THEN
                 CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH1),IVRFH1)
+                FCONEL(JBRPS)=IVRFH1
             ELSE
                 CALL TIMFUN (TABF,HHP,TEMP,ITFMAX(IVRFH2),IVRFH2)
                 FCONEL(JBRPS)=IVRFH2
@@ -4229,6 +4360,7 @@ C=======================================================================
 !       WRITE(*,*) "posle petlje po elementima"
         CALL DATE_AND_TIME(VALUES=Dtime)
         WRITE(*,*) 'posle petlje po elementima', (Dtime(i),i=5,7)
+        WRITE(3,*) 'posle petlje po elementima', (Dtime(i),i=5,7)
 C=======================================================================
 C CVOROVI NA LINIJI PROCURIVANJA       
 C=======================================================================
@@ -4239,7 +4371,7 @@ C        IF(ITER.EQ.0) CALL CURI1(CORD,A(LSK),SILE,MAXA,TT1,ID,ICUR)
        ENDIF
 C==========================================================================
 C MUMPS alociranje matrice krutosti
-1235  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+3456  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(ITER,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(ISOLVER,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(NBLOCK,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
@@ -4309,7 +4441,7 @@ cz proveriti rad sa blokovima i zadlev
           ENDIF
           endif
         CALL DATE_AND_TIME(VALUES=Dtime)
-        WRITE(*,*) 'pre ZADLEV', (Dtime(i),i=5,7)
+        WRITE(3,*) 'pre ZADLEV', (Dtime(i),i=5,7)
           
           IF(ISOLVER.EQ.0) THEN
             if(myid.eq.0) CALL ZADLEV(A(LSK),MAXA,A(LNZADJ),NUMZAD,NZAD)
@@ -4318,13 +4450,13 @@ cz proveriti rad sa blokovima i zadlev
      1                                  CORD,VVREME,TABF,NTABFT,ITFMAX)
           ENDIF
         CALL DATE_AND_TIME(VALUES=Dtime)
-        WRITE(*,*) 'posle ZADLEV', (Dtime(i),i=5,7)
+        WRITE(3,*) 'posle ZADLEV', (Dtime(i),i=5,7)
           CALL RESEN(A(LSK),TT10,MAXA,JEDN,1)
         ENDIF
         CALL DATE_AND_TIME(VALUES=Dtime)
-        WRITE(*,*) 'posle RESEN', (Dtime(i),i=5,7)
+        WRITE(3,*) 'posle RESEN', (Dtime(i),i=5,7)
 !         ENDIF
-
+       IF (myid.ne.0) goto 4567
        TOL=1.0D-7
 !        WRITE(*,*) "pre petlje po zadatim vrednostima"
 C=======================================================================
@@ -4397,12 +4529,22 @@ cz oduzimanje zadate vrednosti od prethodno izracunate
              SILE(ID(1,NZAD(1,I)))=1.D035*
      1                   (ZADVRE(I)*FK1-TT1(ID(1,NZAD(1,I))))
          ENDIF
+!         write(iizlaz,*)'desna',I,NZAD(1,I),SILE(ID(1,NZAD(1,I)))
 !        ENDIF
 C===========================================================================
   410  CONTINUE
-
-c         call wrr(SILE,JEDN,'s-p')
-      CALL RESEN(A(LSK),SILE,MAXA,JEDN,2)
+ 4567  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+       CALL RESEN(A(LSK),SILE,MAXA,JEDN,2)
+! !  za Milosa
+!          IF (KKORAK.eq.1) then
+!             DO I = 1, JEDN
+!                WRITE(1005,*) SILE(i)
+!             END DO
+!          ENDIF
+!  kraj stampe za Milosa
+      IF (myid.ne.0) goto 2346
+      CALL DATE_AND_TIME(VALUES=Dtime)
+      WRITE(3,*) 'posle RESEN-a 2', (Dtime(i),i=5,7)
 c         call wrr(SILE,JEDN,'s-k')
 c     OVDE UCITATI RESENJA SA DISKA U VEKTOR SILE
 c
@@ -4430,15 +4572,24 @@ C
  440       CONTINUE
 !  Sneza 31.03.2017.
 !  Ako radi stacionarnu linearnu analizu ima samo jedan prolaz, ne proverava se konvergenicja
-        WRITE(*,*)'period,korak=',NNPER,KORAK
-        IF(LINTE.EQ.0) goto 491
+!         WRITE(*,*)'period,korak=',NNPER,KORAK
+ 2346  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+!         WRITE(*,*)'MPI_BCAST, linte',LINTE
+      CALL MPI_BCAST(LINTE,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+!         WRITE(*,*)'MPI_BCAST, MAXIT',MAXIT
+      CALL MPI_BCAST(MAXIT,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+       IF(LINTE.EQ.0) goto 491
 ! 
 !       WRITE(*,*)'ITER= ',ITER
 !       WRITE(*,*)'PERIOD= ',NNPER
 !       WRITE(*,*)'STEP= ',KKORAK
 !       IF(NXNASTRAN.EQ.1) go to 491
 C
+        WRITE(*,*)'KONVTF'
       CALL KONVTF(TT1,SILE,KONVV2,1,ID,ITER)
+C
+!  2346  CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+       CALL MPI_BCAST(KONVV2,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
 C
         IF (KKORAK.GT.1) THEN
 C
@@ -4455,7 +4606,7 @@ cz          if(nasilu.eq.0) then
           ENDIF
         endif 
         CALL DATE_AND_TIME(VALUES=Dtime)
-        WRITE(*,*) 'pre racunanja gradijenta', (Dtime(i),i=5,7)
+        WRITE(3,*) 'pre racunanja gradijenta', (Dtime(i),i=5,7)
 
         IF ((NJUTN.NE.0).AND.(INDOPT.EQ.0)) RETURN
 
@@ -4464,7 +4615,9 @@ C RACUNANJE GRADIJENTA Temperature
 C=======================================================================
 C  PETLJA PO ELEMENTIMA
 C
- 491  DO 500 NBREL=1,NET
+ 491  IF (myid.ne.0) goto 2345
+!        WRITE(*,*)'pre gradijenta'
+      DO 500 NBREL=1,NET
       IF(elemtip(NBREL).gt.100) THEN
         NTYPE=elemtip(NBREL)/100
         NTIMES=100
@@ -4473,6 +4626,8 @@ C
         NTIMES=10
       ENDIF
       NDIMEL=elemtip(NBREL)-NTIMES*NTYPE
+      
+!       WRITE(*,*)'NBREL=',NBREL
       
       VZAPR=0.
       NMAT=NEL(NDIM+1,NBREL)
@@ -4685,83 +4840,119 @@ C=======================================================================
  500  CONTINUE
 C
 C
+        CALL DATE_AND_TIME(VALUES=Dtime)
+      WRITE(*,*) 'vreme pre stampanja', (Dtime(i),i=5,7)
+      WRITE(3,*) 'vreme pre stampanja', (Dtime(i),i=5,7)
       WRITE(IIZLAZ,*)'PERIOD NUMBER,KKORAK ',NNPER, KKORAK        
+      WRITE(*,*)'PERIOD NUMBER,KKORAK ',NNPER, KKORAK        
       IF (KKORAK.GT.0) THEN
+! otvaranje fajla za stampanje zapreminskih sila
+CE WRITING TEMPERATURES FOR TERMOMECHANIC
+C      CALL RESTEL(VVREME,TT1,NPT,19) 
+C NPRINT definise korak u kome se stampaju temperature za PAKS
+!       write(*,*)'NPRINT,KORAK',NPRINT,KORAK
+!       IF(NPRINT.EQ.1)THEN
+!         CALL RESTEL(VVREME,TT1,NPT,IDJSTAMP1,NP3D1,ISNUMER)
+!       ELSEIF(KORAK.EQ.NPRINT) THEN
+       IF(IDJERDAP.GT.0) THEN
+        CALL OTVTEMP(KKORAK)
+        write(*,*)'RESTEL,NPRINT,KORAK',NPRINT,KKORAK
+        CALL RESTEL(VVREME,TT1,NPT,ISNUMER,KKORAK)
+      ENDIF
 C Sneza 24.06.2011 dodato da stampa rezultate samo za odredjene cvorove
 C stampanje potencijala
       IF (INDSC.EQ.0.OR.INDSC.EQ.3.OR.INDSC.EQ.4) THEN
-        CALL STAU09c(TT1,CORD,ID,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
-     1               NEL)
+        CALL STAU09c(TT1,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
+     1               ISNUMER)
 C        CALL PRKONT1c(TT1,ID,UBRZ,CORD,NZAD,IOSA,IVECT,ZADVRE,KOJK)
 C stampanje dubine vode
 C       CALL STAU09c(TT1,CORD,ID,NPT,49,11,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
 C stampa rezultata u neu za sve cvorove STAS09T
-C stampanje elemenata nakojima je zadat flux
+C stampanje elemenata na kojima je zadat flux
         IF(MAXSIL.GT.0) 
-     1  CALL STAS09T(ID,NPT,49,10,1,KKORAK,NGPSIL,MAXSIL)
+     1  CALL STAS09T(NPT,49,10,1,KKORAK,NGPSIL,MAXSIL,ISNUMER)
 !  stampanje elemenata na kojima je zadata prelaznost - stampa se ID f-je koef. prelaznosti
         IF(MAXTQE.GT.0)THEN 
-          CALL STAS09T(ID,NPT,49,12,1,KKORAK,NGPSIL,MAXTQE)
+          CALL STAS09T(NPT,49,12,1,KKORAK,NGPSIL,MAXTQE,ISNUMER)
 !  stampanje temperature prema Bofangu
-          CALL STAS09T(ID,NPT,49,19,1,KKORAK,NGPSIL,MAXTQE)
+!       WRITE(*,*)'pre STAS09T'        
+          CALL STAS09T(NPT,49,19,1,KKORAK,NGPSIL,MAXTQE,ISNUMER)
         ENDIF
 ! 
-       CALL STAU09T(TT1,CORD,ID,NPT,49,9,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
-       CALL STAU09T(TT1,CORD,ID,NPT,49,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
+       CALL STAU09T(TT1,NPT,49,9,1,KKORAK,NZAD,NUMZAD,KONT,
+     1       TT1,ISNUMER)
+       CALL STAU09T(TT1,NPT,49,1,1,KKORAK,NZAD,NUMZAD,KONT,
+     1       TT1,ISNUMER)
 !  DUBINA VODE
 !        CALL STAU09T(TT1,CORD,ID,NPT,49,11,1,KKORAK,NZAD,NUMZAD,KONT,TT1)
 !  BRZINE
 !       CALL STAU09T(VECTJ,CORD,ID,NPT,49,41,3,KKORAK,NZAD,NUMZAD,KONT,
 !      1     TT1)
-       CALL STAU09T(GRADJN,CORD,ID,NPT,49,51,3,KKORAK,NZAD,NUMZAD,KONT,
-     1            TT1)
-CE WRITING TEMPERATURES FOR TERMOMECHANIC
-C      CALL RESTEL(VVREME,TT1,NPT,19) 
-C NPRINT definise korak u kome se stampaju temperature za PAKS
-!       write(*,*)'NPRINT,KORAK',NPRINT,KORAK
-      IF(NPRINT.EQ.1)THEN
-        CALL RESTEL(VVREME,TT1,NPT,IDJSTAMP1,NP3D1)
-      ELSEIF(KORAK.EQ.NPRINT) THEN
-      write(*,*)'RESTEL,NPRINT,KORAK',NPRINT,KORAK
-         CALL RESTEL(VVREME,TT1,NPT,IDJSTAMP1,NP3D1)
-      ENDIF
- 
+       CALL STAU09T(GRADJN,NPT,49,51,3,KKORAK,NZAD,NUMZAD,KONT,
+     1            TT1,ISNUMER)
 C stampanje rezultata u svim cvorovima
-      CALL IZLL3DT(ID,TT1,KKORAK,VECTJ,QUK,QUM,VVREME,VG,GG,
-     1            KOTES)
-
-      CALL STAG3D(TT1,ID,NASLOV,VVREME,KKORAK,1,NPT,18,0,NET,NEL,
-     1            KORAK,VECTJ,CORD,GRADJN,NZAD,FZAPR)
+!       WRITE(*,*)'pre lst'        
+      CALL IZLL3DT(TT1,KKORAK,VECTJ,VVREME,VG,GG,
+     1            KOTES,ISNUMER)
+!       WRITE(*,*)'pre STAG3D'        
+      CALL STAG3D(TT1,NASLOV,VVREME,KKORAK,1,NPT,18,0,NET,
+     1            KORAK,VECTJ,GRADJN,NZAD,FZAPR,ISNUMER)
       ENDIF
       IF (INDSC.EQ.1.OR.INDSC.EQ.3) THEN
-        CALL STAU09c(TT1,CORD,ID,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
-     1               NEL)
+        CALL STAU09c(TT1,NPT,47,1,1,KKORAK,NZAD,NUMZAD,KONT,TT1,
+     1               NEL,ISNUMER)
       ENDIF
       IF(INDSC.EQ.2.OR.INDSC.EQ.4) THEN
-        CALL STAU09CT(TT1,CORD,47,VVREME,KKORAK,NEL)
+        CALL STAU09CT(TT1,47,VVREME,KKORAK,NEL,ISNUMER)
+      IF(NPRINT.EQ.1)THEN
+!         CALL RESTEL(VVREME,TT1,NPT,IDJSTAMP1,NP3D1)
+       CALL STAU09T(TT1,NPT,49,1,1,KKORAK,NZAD,NUMZAD,KONT,
+     1       T1,ISNUMER)
+      ELSEIF(KORAK.EQ.NPRINT) THEN
+      write(*,*)'TEMP,NPRINT,KORAK',NPRINT,KORAK
+       CALL STAU09T(TT1,NPT,49,1,1,KKORAK,NZAD,NUMZAD,KONT,
+     1       TT1,ISNUMER)
+!          CALL RESTEL(VVREME,TT1,NPT,IDJSTAMP1,NP3D1)
+      ENDIF
       ENDIF
       ENDIF
 C
+! Stampanje rezultata u presecima
+      IF(ISPRESEK.GT.0) THEN
+         CALL STAMPPRESEKNEU(TT1,VECTJ,
+     +       VREME,VVREME,KKORAK,ISNUMER)
+      ENDIF
+! 
       IF(NXNASTRAN.EQ.1) RETURN
 C
       KKORAK=KKORAK+1
 c uslova da sledeci korak u tom periodu ne postoji i da ide na sledeci period
-      IF (DABS(VREME(NNPER,KORAK+1)).LT.1.D-10) THEN
+ 2345 CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+      VRNPKOR=DABS(VREME(NNPER,KORAK+1))
+      CALL MPI_BCAST(VRNPKOR,1,MPI_DOUBLE,0,MPI_COMM_WORLD,ierr)
+      IF (VRNPKOR.LT.1.D-10) THEN
         GOTO 600
       ELSE
 cz ide na sledeci korak      
         GOTO 35
       ENDIF
+ 
   600 CONTINUE
-      IF(NSTAC.EQ.1.AND.KKORAK.EQ.2) 
-     1  CALL IZBACIT(TT1,CORD,ID,NPT,NEL,NET,NDIM,IIZLAZ)
-     
+         CALL DATE_AND_TIME(VALUES=Dtime)
+      WRITE(*,*) 'vreme pre stampanja', (Dtime(i),i=5,7)
+      WRITE(3,*) 'vreme pre stampanja', (Dtime(i),i=5,7)
+      if (myid.eq.0) then
+        IF(NSTAC.EQ.1.AND.KKORAK.EQ.2) 
+     1    CALL IZBACIT(TT1,CORD,ID,NPT,NEL,NET,NDIM,IIZLAZ)
+      endif
+      CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
       RETURN      
       END
 C=======================================================================
 C=======================================================================
-      SUBROUTINE IZLL3DT(ID,TT1,KORAK,VECTJ,QUK,QUM,VVREME,VG,GG,
-     1                  KOTES)
+      SUBROUTINE IZLL3DT(TT1,KORAK,VECTJ,VVREME,VG,GG,
+     1                  KOTES,ISNUMER)
+      USE NODES
       USE ELEMENTS
       USE KONTURE
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
@@ -4779,9 +4970,9 @@ C=======================================================================
       COMMON /ICITANJE/INPT
       COMMON /PRIKAZ/ INDSC,IZPOT
 
-      DIMENSION D4(4),TT1(*),VECTJ(3,*),ID(1,*),N4(4)
+      DIMENSION D4(4),TT1(*),VECTJ(3,*),N4(4)
       DIMENSION NRED(8),NREDK(8),NRED1(3)
-      DIMENSION VG(3,NET,*),GG(3,NET,*),QUK(1000),QUM(1000),NREDT(4)
+      DIMENSION VG(3,NET,*),GG(3,NET,*),NREDT(4)
       DIMENSION NREDT10(10),VGT(3),NRED26(6),NRED28(8)
       DATA NRED/8,4,2,6,7,3,1,5/  
       DATA NREDK/27,9,3,21,25,7,1,19/
@@ -4807,7 +4998,11 @@ C
    20 DO 50 I=1,4
       KG = KG +1
       IF(KG.GT.NPT) GO TO 100
-      N4(I) = KG
+      IF(ISNUMBER.EQ.0) THEN
+        N4(I) = KG 
+      ELSE
+        N4(I) = NCVEL(KG)
+      ENDIF
       JJEDN=ID(1,KG)
       IF(JJEDN.EQ.0) THEN
         D4(I) = 0.
@@ -4834,173 +5029,6 @@ C
       GO TO 20
       ENDIF
 C
-!       IF(ISRPS.EQ.0)
-!      1WRITE(IIZLAZ,2028)
-!       IF(ISRPS.EQ.1)
-!      1WRITE(IIZLAZ,6028)
-C
-CS  GUSTINE STRUJE U PRAVCU X1     
-CE  CURRENT DESNITIES IN DIRECTION X1
-C
-! 
-!       KG = 0
-!   620 DO 650 I=1,4
-!       KG = KG +1
-!       IF(KG.GT.NPT) GO TO 1600
-!       N4(I) = KG
-!          D4(I) = VECTJ(1,KG)
-!   650 CONTINUE
-! C
-!  1600 I = I - 1
-!       IF(IFORM.EQ.1) GO TO 688
-!       IF(INPT.EQ.1) THEN
-!        WRITE(IIZLAZ,5012) (N4(J1),D4(J1),J1=1,I)
-!       ELSE
-!        WRITE(IIZLAZ,5002) (N4(J1),D4(J1),J1=1,I)
-!       ENDIF
-!       GO TO 677
-! C
-!   688 IF(INPT.EQ.1) THEN
-!        WRITE(IIZLAZ,5013) (N4(J1),D4(J1),J1=1,I)
-!       ELSE
-!        WRITE(IIZLAZ,5003) (N4(J1),D4(J1),J1=1,I)
-!       ENDIF
-!   677 IF(KG.LT.NPT) THEN
-!       GO TO 620
-!       ENDIF
-! 
-!       IF(ISRPS.EQ.0)
-!      1WRITE(IIZLAZ,2039)
-!       IF(ISRPS.EQ.1)
-!      1WRITE(IIZLAZ,6039)
-! C
-! CS  GUSTINE STRUJE U PRAVCU X2     
-! CE  CURRENT DESNITIES IN DIRECTION X2
-! C
-! 
-!       KG = 0
-!   720 DO 750 I=1,4
-!       KG = KG +1
-!       IF(KG.GT.NPT) GO TO 1700
-!       N4(I) = KG
-!          D4(I) = VECTJ(2,KG)
-!   750 CONTINUE
-! C
-!  1700 I = I - 1
-!       IF(IFORM.EQ.1) GO TO 788
-!       IF(INPT.EQ.1) THEN
-!        WRITE(IIZLAZ,5012) (N4(J1),D4(J1),J1=1,I)
-!       ELSE
-!        WRITE(IIZLAZ,5002) (N4(J1),D4(J1),J1=1,I)
-!       ENDIF
-!       GO TO 777
-! C
-!   788 IF(INPT.EQ.1) THEN
-!        WRITE(IIZLAZ,5013) (N4(J1),D4(J1),J1=1,I)
-!       ELSE
-!        WRITE(IIZLAZ,5003) (N4(J1),D4(J1),J1=1,I)
-!       ENDIF
-!   777 IF(KG.LT.NPT) THEN
-!       GO TO 720
-!       ENDIF
-! C
-!       IF(ISRPS.EQ.0)
-!      1WRITE(IIZLAZ,2049)
-!       IF(ISRPS.EQ.1)
-!      1WRITE(IIZLAZ,6049)
-! C
-! CS  GUSTINE STRUJE U PRAVCU X3     
-! CE  CURRENT DESNITIES IN DIRECTION X3
-! C
-! 
-!       KG = 0
-!   820 DO 850 I=1,4
-!       KG = KG +1
-!       IF(KG.GT.NPT) GO TO 1800
-!       N4(I) = KG
-!          D4(I) = VECTJ(3,KG)
-!   850 CONTINUE
-! C
-!  1800 I = I - 1
-!       IF(IFORM.EQ.1) GO TO 888
-!       IF(INPT.EQ.1) THEN
-!        WRITE(IIZLAZ,5012) (N4(J1),D4(J1),J1=1,I)
-!       ELSE
-!        WRITE(IIZLAZ,5002) (N4(J1),D4(J1),J1=1,I)
-!       ENDIF
-!       GO TO 877
-! C
-!   888 IF(INPT.EQ.1) THEN
-!        WRITE(IIZLAZ,5013) (N4(J1),D4(J1),J1=1,I)
-!       ELSE
-!        WRITE(IIZLAZ,5003) (N4(J1),D4(J1),J1=1,I)
-!       ENDIF
-!   877 IF(KG.LT.NPT) THEN
-!       GO TO 820
-!       ENDIF
-! 
-C
-CS  BRZINE
-C
-!       NGAUS=IBRGT*IBRGT*IBRGT
-!       IF(ISRPS.EQ.0)
-!      1WRITE(IIZLAZ,2059)
-!       IF(ISRPS.EQ.1)
-!      1WRITE(IIZLAZ,6059)
-!       IF (INDSC.EQ.0)THEN
-!        DO I=1,NET
-!          IF(elemtip(I).gt.100) THEN
-!           NTYPE=elemtip(I)/100
-!           NTIMES=100
-!         ELSE
-!           NTYPE=elemtip(I)/10
-!           NTIMES=10
-!         ENDIF
-!         NDIMEL=elemtip(I)-NTIMES*NTYPE
-!          WRITE(IIZLAZ,5000) I
-!        DO J=1,NDIMEL
-!          NC=NEL(J,I)
-!          NG=NRED(J)
-!          SELECT CASE(elemtip(I))
-!           CASE(12:13)
-!             NG=NRED1(J)
-!           CASE(23:26)
-!             NG=NRED26(J)
-!           CASE(34,310)
-!             NG=NREDT10(J)
-!           CASE DEFAULT
-! !          WRITE(*,*) 'ELEMENT TYPE UNKNOWN NETIP=',elemtip(NBREL)
-!          END SELECT
-! !          IF(NDIMEL.eq.2) NG=NRED1(J)
-! !          IF(NDIMEL.eq.10) NG=NREDT10(J)
-! 	 IF(KOTES.EQ.1) NG=NREDK(J)
-! 	     IF(INPT.EQ.1) THEN
-!               IF(NG.GT.10) THEN
-!                 NG1=NG/10
-!                 NG2=NG-NG1*10
-!                 DO K=1,3
-!                   VGT(K)=(VG(K,I,NG1)+(VG(K,I,NG2)))/2
-!                 ENDDO
-!                 WRITE(IIZLAZ,5017) NC,(VGT(K),K=1,3)
-!               ELSE
-!                 WRITE(IIZLAZ,5017) NC,(VG(K,I,NG),K=1,3)
-!               ENDIF
-! 	     ELSE
-!               IF(NG.GT.10) THEN
-!                 NG1=NG/10
-!                 NG2=NG-NG1*10
-!                 DO K=1,3
-!                   VGT(K)=(VG(K,I,NG1)+(VG(K,I,NG2)))/2
-!                 ENDDO
-!                 WRITE(IIZLAZ,5007) NC,(VGT(K),K=1,3)
-!               ELSE
-!                 WRITE(IIZLAZ,5007) NC,(VG(K,I,NG),K=1,3)
-!               ENDIF
-! 	     ENDIF
-!        ENDDO
-!        ENDDO
-!       ENDIF
-C
 CS  GRADIJENTI
 C
       IF(ISRPS.EQ.0)
@@ -5017,9 +5045,17 @@ C
           NTIMES=10
         ENDIF
         NDIMEL=elemtip(I)-NTIMES*NTYPE
-         WRITE(IIZLAZ,5000) I
+        IF(ISNUMBER.EQ.0) THEN
+          WRITE(IIZLAZ,5000) I
+        ELSE
+          WRITE(IIZLAZ,5000) MCVEL(I)
+        ENDIF
         DO J=1,NDIMEL
-         NC=NEL(J,I)
+         IF(ISNUMBER.EQ.0) THEN
+           NC=NEL(J,I)
+         ELSE
+           NC=NCVEL(NEL(J,I))
+         ENDIF
          NG=NRED(J)
          SELECT CASE(elemtip(I))
           CASE(12:13)
@@ -5076,61 +5112,50 @@ C
      1,'             '//
      1' CVOR  POMERANJE   CVOR  POMERANJE   CVOR  POMERANJE   CVOR POMER 
      1NJE   '/' BROJ',3(14X,'BROJ'))
-!  2028 FORMAT(/'     C V O R N E   B R Z I N E   U   X 1  P R A V C U '//
-!      1' CVOR    BRZINA    CVOR    BRZINA    CVOR    BRZINA    CVOR   BRZ       
-!      1INA   '/' BROJ',3(14X,'BROJ'))
-!  2039 FORMAT(/'     C V O R N E   B R Z I N E   U   X 2  P R A V C U '//
-!      1' CVOR    BRZINA    CVOR    BRZINA    CVOR    BRZINA    CVOR   BRZ       
-!      1INA   '/' BROJ',3(14X,'BROJ'))
-!  2049 FORMAT(/'     C V O R N E   B R Z I N E   U   X 3  P R A V C U '//
-!      1' CVOR    BRZINA    CVOR    BRZINA    CVOR    BRZINA    CVOR   BRZ       
-!      1INA   '/' BROJ',3(14X,'BROJ'))
-!  2059 FORMAT(//'     C V O R N E   B R Z I N E'/
-!      1' CVOR    BRZINA VX    BRZINA VY    BRZINA VZ')
- 2069 FORMAT(//'     C V O R N I   G R A D I J E N T I'/
+ 2069 FORMAT(//'     G R A D I J E N T I  U   C V O R U   '/
      1' CVOR GRADIJENT GX GRADIJENT GY GRADIJENT GZ')
  6001 FORMAT(/'    N O D A L    T O T A L     T E M P E R A T U R E    '
      1,'                 '//
      1' NODE  DISPLAC.    NODE  DISPLAC.    NODE  DISPLAC.    NODE DISPL
      1AC.   '/'  No.',3(15X,'No.'))
-!  6028 FORMAT(/'    N O D A L    V E L O C I T I E S   I N   D I R E C T'
-!      1,' I O N   X 1 '//
-!      1' NODE  VELOCITY    NODE  VELOCITY    NODE  VELOCITY    NODE VELOC
-!      1ITY   '/'  No.',3(15X,'No.'))
-!  6039 FORMAT(/'    N O D A L    V E L O C I T I E S   I N   D I R E C T'
-!      1,' I O N   X 2 '//
-!      1' NODE  VELOCITY    NODE  VELOCITY    NODE  VELOCITY    NODE VELOC
-!      1ITY   '/'  No.',3(15X,'No.'))
-!  6049 FORMAT(/'    N O D A L    V E L O C I T I E S   I N   D I R E C T'
-!      1,' I O N   X 3 '//
-!      1' NODE  VELOCITY    NODE  VELOCITY    NODE  VELOCITY    NODE VELOC
-!      1ITY   '/'  No.',3(15X,'No.'))
-!  6059 FORMAT(//'    N O D A L    V E L O C I T I E S'/
-!      1' NODE  VELOCITY VX  VELOCITY VY  VELOCITY VZ')
  6069 FORMAT(//'    N O D A L    G R A D I E N T S  '/
      1' NODE  GRADIENT GX  GRADIENT GY  GRADIENT GZ')
-!  7023 FORMAT(//'    F L U X   W I T H I N  C O N T O U R            '/)
       END
 C=======================================================================
       SUBROUTINE DJERDAPREAD(IDJSTAMP1,NP3D1)
+       USE NODES
        IMPLICIT DOUBLE PRECISION(A-H,O-Z)
-       COMMON /DJERDAP/ IDJERDAP
+       COMMON /DJERDAP/ IDJERDAP,ISPRESEK
        COMMON /ICITANJE/ INPT
        COMMON /NUMNPT/ NUMZAD,NPT,NDIM,MAXSIL,JEDN,NWK,NET
        DIMENSION NP3D1(5),NDJEL(21),IDJSTAMP1(5,*)
-       CHARACTER*5 IME(5)
+       CHARACTER*6 IME(5)
+       CHARACTER*2 IMECSV1
+       CHARACTER*1 IMECSV
        
 !        CALL ICLEAR(NP3D1,5)
 !        KK=1
+        IF (IDJERDAP.LE.10) THEN
+          write(IMECSV1,20) IDJERDAP
+          IME='DJ3D' // IMECSV1    
+!         if(IPAKT.EQ.1)IME='PDJT' // IMECSV1 // '.NEU'
+        ELSE
+          write(IMECSV,21) IDJERDAP
+          IME='DJ3D' // IMECSV     
+!         if(IPAKT.EQ.1)IME='PDJT' // IMECSV // '.NEU'
+        ENDIF
        IIFILE=90
-       IME(1)='DJ3D1'
-       IME(2)='DJ3D2'
-       IME(3)='DJ3D3'
-       IME(4)='DJ3D4'
-       IME(5)='DJ3D5'
+! !        IMECSV=IME(1:IB-1)//'.CSV'
+!        Write( xpresek, '(i10)' ) IDJERDAP
+!        IME(1)='DJ3D'//xpresek
+!        IME(2)='DJ3D2'
+!        IME(3)='DJ3D3'
+!        IME(4)='DJ3D4'
+!        IME(5)='DJ3D5'
        icitanjedj=1
        DO KK=1,icitanjedj
-          IIFILE=IIFILE+1
+          NP3D1(KK)=0
+          IIFILE=IIFILE+IDJERDAP
 c          OPEN (IIFILE,FILE='DJ3D1',STATUS='UNKNOWN',FORM='FORMATTED',
           OPEN (IIFILE,FILE=IME(KK),STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
@@ -5160,10 +5185,18 @@ C
 !                    READ(IIFILE,1111) (NDJEL(J),J=IT1+1,NCVE)
                 ENDIF
                 DO K=2,NCVE+1
+                 IF(ISNUMER.EQ.0)THEN
                    IDJSTAMP1(KK,NDJEL(K))=KK
+                 ELSE
+                   NN=NDJEL(K)
+                   N=NN-NPI+1
+                   NI=NELCV(N)
+                   IDJSTAMP1(KK,NI)=KK
+                 ENDIF
                 ENDDO
              ENDDO
              DO I=1,NPT
+! odredjivanje broja cvorova za koje se pisu zapreminske sile             
                 IF(IDJSTAMP1(KK,I).EQ.KK) NP3D1(KK)=NP3D1(KK)+1
              ENDDO
 !              write(*,*) 'kraj citanja NP3D1',NP3D1(KK)
@@ -5174,72 +5207,332 @@ C
         go to 9998  
  9999     write(*,*) ' NE POSTOJI FAJL DJ3D '         
           write(3,*) ' NE POSTOJI FAJL DJ3D '
+   20  FORMAT (I1)
+   21  FORMAT (I2)
  1111 FORMAT(21I5)
  4111 FORMAT(21I10)
  9998 RETURN
       END
 C=======================================================================
-      SUBROUTINE DJERDAPREADT(IDJSTAMP1,NP3D1)
+      SUBROUTINE DJERDAPREADT(NP3D1,ISNUMER,II)
+       USE PPR
+       USE NODES
        IMPLICIT DOUBLE PRECISION(A-H,O-Z)
-       COMMON /DJERDAP/ IDJERDAP
+       COMMON /DJERDAP/ IDJERDAP,ISPRESEK
        COMMON /ICITANJE/ INPT
        COMMON /NUMNPT/ NUMZAD,NPT,NDIM,MAXSIL,JEDN,NWK,NET
-       DIMENSION NP3D1(5),NDJEL(21),IDJSTAMP1(5,*)
-       CHARACTER*6 IME(5)
-       
+       DIMENSION NDJEL(21),NP3D1(18)
+!        CHARACTER*6 IME(5)
+        CHARACTER*20 IME
+        CHARACTER*2 IMECSV
+        CHARACTER*1 IMECSV1
+!         write(*,*)"IP",IP
+        IIDJERDAP=IDJERDAP
+        IF(IDJERDAP.EQ.-1) THEN
+         IIDJERDAP=II
+        if (allocated(IDJSTAMP1)) deallocate(IDJSTAMP1)
+        ENDIF
+        IF (IIDJERDAP.LT.10) THEN
+          write(IMECSV1,20) IIDJERDAP
+          IME='DJ3D' // IMECSV1    
+!         if(IPAKT.EQ.1)IME='PDJT' // IMECSV1 // '.NEU'
+        ELSE
+          write(IMECSV,21) IIDJERDAP
+          IME='DJ3D' // IMECSV     
+!         if(IPAKT.EQ.1)IME='PDJT' // IMECSV // '.NEU'
+        ENDIF
+        write(*,*) "ime", IME
 !        KK=1
        IIFILE=90
-       IME(1)='DJ3DT1'
-       IME(2)='DJ3DT2'
-       IME(3)='DJ3DT3'
-       IME(4)='DJ3DT4'
-       IME(5)='DJ3DT5'
-       DO KK=1,5
-          IIFILE=IIFILE+1
+        KK=1
+!        DO KK=1,1
+          NP3D1(KK)=0
+          IIFILE=IIFILE+IIDJERDAP
 c          OPEN (IIFILE,FILE='DJ3D1',STATUS='UNKNOWN',FORM='FORMATTED',
-          OPEN (IIFILE,FILE=IME(KK),STATUS='UNKNOWN',FORM='FORMATTED',
+          OPEN (IIFILE,FILE=IME,STATUS='UNKNOWN',FORM='FORMATTED',
      1      ACCESS='SEQUENTIAL')
 C
-!            OPEN (92,FILE='DJ3D2',STATUS='UNKNOWN',FORM='FORMATTED',
-!      1      ACCESS='SEQUENTIAL')
-!            OPEN (93,FILE='DJ3D3',STATUS='UNKNOWN',FORM='FORMATTED',
-!      1      ACCESS='SEQUENTIAL')
-!            OPEN (94,FILE='DJ3D4',STATUS='UNKNOWN',FORM='FORMATTED',
-!      1      ACCESS='SEQUENTIAL')
-!            OPEN (95,FILE='DJ3D5',STATUS='UNKNOWN',FORM='FORMATTED',
-!      1      ACCESS='SEQUENTIAL')
-
-           READ(IIFILE,4111,err=9999) NDJ3D1,IT1,NCVE
-!           IF(STATTT.EQ.'OLD') THEN
+!  6.8.2018. promenjeno da cita cvorove u kojima se stampaju sile, ne elemente sa cvorovima za koje se stampaju
+!           READ(IIFILE,4111,err=9999) NDJ3D1,IT1,NCVE
+          READ(IIFILE,4001,err=9999)NP3D1(KK)
+      if(.not.allocated(IDJSTAMP1))allocate
+     1   (IDJSTAMP1(1,NP3D1(KK)),STAT=istat) 
+      DO I=1,1
+        DO JJ=1,NP3D1(KK)
+          IDJSTAMP1(I,JJ)=0
+        ENDDO
+      ENDDO
 !             OPEN (91,FILE='DJ3D1',STATUS='OLD',FORM='FORMATTED',
 !      1      ACCESS='SEQUENTIAL')
 !             READ(91,4111) NDJ3D1,IT1,NCVE
-!            write(*,*) 'NDJ3D1',NDJ3D1
-           DO I=1,NDJ3D1
-                READ(IIFILE,*)
+             write(*,*) 'NP3D1(KK)',NP3D1(KK)
+           DO I=1,NP3D1(KK)
+!                 READ(IIFILE,*)
                 IF(INPT.EQ.1) THEN
-                   READ(IIFILE,4111) (NDJEL(J),J=1,IT1)
-                   READ(IIFILE,4111) (NDJEL(J),J=IT1+1,NCVE)
+                   READ(IIFILE,4001) IDJSTAMP1(KK,I)
+!                    READ(IIFILE,4111) (NDJEL(J),J=1,IT1)
+!                    READ(IIFILE,4111) (NDJEL(J),J=IT1+1,NCVE)
                 ELSE
-                   READ(IIFILE,1111) (NDJEL(J),J=1,IT1)
-                   READ(IIFILE,1111) (NDJEL(J),J=IT1+1,NCVE)
+                   READ(IIFILE,1001) IDJSTAMP1(KK,I)
+!                    READ(IIFILE,1111) (NDJEL(J),J=1,IT1)
+!                    READ(IIFILE,1111) (NDJEL(J),J=IT1+1,NCVE)
                 ENDIF
-                DO K=1,NCVE
-                   IDJSTAMP1(KK,NDJEL(K))=KK
-                ENDDO
-             ENDDO
-             DO I=1,NPT
-                IF(IDJSTAMP1(KK,I).EQ.KK) NP3D1(KK)=NP3D1(KK)+1
-             ENDDO
+!                 DO K=1,NCVE
+                  IF(ISNUMER.EQ.0)THEN
+!                    IDJSTAMP1(KK,NDJEL(K))=KK
+                  ELSE
+!                     NN=NDJEL(K)
+                    NN=IDJSTAMP1(KK,I)
+                    N=NN-NPI+1
+                    NI=NELCV(N)
+                    IDJSTAMP1(KK,I)=NI
+! !              write(*,*) "I,k,NN",I,K,NN,NI              
+                  ENDIF
+!              write(*,*) 'IDJSTAMP1',I, IDJSTAMP1(KK,I)
+!                 ENDDO
+            ENDDO
+!              DO I=1,NPT
+!                 IF(IDJSTAMP1(KK,I).EQ.KK) NP3D1(KK)=NP3D1(KK)+1
+!              ENDDO
              write(*,*) 'kraj citanja NP3D1',NP3D1(KK)
 !           ELSE
 !              STOP ' NEMA FAJLA DJ3D1'
 !           ENDIF
-        ENDDO
+!         ENDDO
         go to 9998  
  9999     write(*,*) ' NE POSTOJI FAJL DJ3DT '         
           write(3,*) ' NE POSTOJI FAJL DJ3D '
+   20  FORMAT (I1)
+   21  FORMAT (I2)
+ 1001 FORMAT(I5)
  1111 FORMAT(14I5)
+ 4001 FORMAT(I10)
  4111 FORMAT(13I10)
  9998 RETURN
       END
+C=======================================================================
+       SUBROUTINE READPRESEK (ISNUMER)
+        USE PRESEK
+        USE ELEMENTS
+        IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+        COMMON /DJERDAP/ IDJERDAP,ISPRESEK
+        COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
+!         DIMENSION NP3D1(5),NDJEL(21)
+        CHARACTER*250 ACOZ
+        CHARACTER*20 IME
+        CHARACTER*2 IMECSV
+        CHARACTER*1 IMECSV1,PREF
+!         CHARACTER*4 PRESECI(18,3)
+!        DATA PRESECI/2,1,12/
+       IPIJEZ=250
+!         select case (IP)
+!          case(1)
+!           PREF='O'
+!          case(2)
+!           PREF='S'
+!          case(3)
+!           PREF='R'
+!          case(4)
+!           PREF='B'
+!         end select       
+        write(*,*) 'IDJERDAP',IDJERDAP
+        IF (IDJERDAP.GE.10) THEN
+          write(IMECSV,21) IDJERDAP
+          IME='L' // IMECSV // '.PRE'    
+!           IME='L' // IMECSV // PREF // '.DAT'    
+        ELSEIF (IDJERDAP.GE.1) THEN
+          write(IMECSV1,20) IDJERDAP
+          IME='L' // IMECSV1 // '.PRE'    
+!           IME='L0' // IMECSV1 // PREF // '.DAT'    
+        ENDIF
+         write(*,*) "IME ",IME
+!         IPIJEZ=IPIJEZ
+        OPEN (IPIJEZ,FILE=IME,STATUS='UNKNOWN',FORM='FORMATTED',
+     1      ACCESS='SEQUENTIAL')
+!         IF(IPAKT.EQ.1)THEN
+!        OPEN (IPIJEZ,FILE='PIJEZT.DAT',STATUS='UNKNOWN',
+!      1      FORM='FORMATTED',ACCESS='SEQUENTIAL')
+!         ENDIF
+!          IF(IP.GT.1)Then
+!            deallocate (NP_ID)
+!            deallocate (NP_ELEMENT)
+!            deallocate (NP_COORDS)
+!            deallocate (NELP)
+!          ENDIF
+!      
+         READ(IPIJEZ,355) IPRES
+         if (.not.allocated(NPRESEK)) 
+     1              allocate(NPRESEK(IPRES),STAT=istat)
+         if (.not.allocated(NPELEM)) 
+     1              allocate(NPELEM(IPRES),STAT=istat)
+         READ(IPIJEZ,356) (NPRESEK(I),I=1,IPRES)
+         READ(IPIJEZ,356) (NPELEM(I),I=1,IPRES)
+         MAXNP=NPRESEK(1)
+         MAXELP=NPELEM(1)
+         IF(IPRES.GT.1) THEN
+           do INP=2,IPRES
+             IF(MAXNP.LT.NPRESEK(INP)) MAXNP=NPRESEK(INP)
+             IF(MAXELP.LT.NPELEM(INP)) MAXELP=NPELEM(INP)
+           enddo
+         ENDIF
+!           write(*,*)"IPRES,MAXNP,MAXELP",IPRES,MAXNP,MAXELP
+!            if (NPRESEK.eq.0) STOP 'nisu definisani cvorovi u preseku'
+              if (.not.allocated(NP_ID)) 
+     1              allocate(NP_ID(MAXNP,IPRES),STAT=istat)
+              if (.not.allocated(NP_ELEMENT)) allocate(NP_ELEMENT
+     1                                 (MAXNP,IPRES),STAT=istat)
+              if (.not.allocated(NP_COORDS)) allocate(NP_COORDS
+     1                               (6,MAXNP,IPRES),STAT=istat)
+              if (.not.allocated(NPROP)) allocate(NPROP
+     1                                 (MAXNP,IPRES),STAT=istat)
+              if (.not.allocated(NELP)) allocate(NELP
+     1                             (5,MAXELP,IPRES),STAT=istat)
+         do INP=1,IPRES
+!            write(*,*)"NPRESEK(INP),NPELEM",NPRESEK(INP),NPELEM(INP)
+           DO I=1,NPRESEK(INP)
+            IF(IPAKT.eq.0) THEN
+             READ(IPIJEZ,360) NP_ID(I,INP),NP_ELEMENT(I,INP),
+     1             (NP_COORDS(jj,I,INP),jj=1,6),NPROP(I,INP)
+            ELSEIF(IPAKT.eq.1) THEN
+             READ(IPIJEZ,358) NP_ID(I,INP),NP_ELEMENT(I,INP),
+     1             (NP_COORDS(jj,I,INP),jj=1,6),NPROP(I,INP)
+            ENDIF
+!        write(3,*)"NP_ID(I)",NP_ID(I,INP),NP_ELEMENT(I,INP),NPROP(I,INP)
+            IF(ISNUMER.EQ.1) THEN
+               NNMP=NP_ELEMENT(I,INP)
+               JJ=NNMP-NMI+1
+            IF(NNMP.LT.NMI.OR.NNMP.GT.NMA.OR.MELCV(JJ).EQ.0) THEN
+            write(*,*) 'pre', INP,NP_ID(I,INP),I,NNMP,'van modela'
+                STOP 
+                ENDIF
+                  NP_ELEMENT(I,INP)=MELCV(JJ)
+              ENDIF
+            ENDDO
+! C elementi u kojima se stampaju vrednosti za prikaz rezultata
+!             if (NPELEM.eq.0) STOP 'nisu definisani elementi u preseku'
+            DO II=1,NPELEM(INP)
+               READ(IPIJEZ,1000) ACOZ
+               READ(ACOZ,359) (NELP(jj,II,INP),jj=1,4)
+               READ(ACOZ,361) NELP(5,II,INP)
+!                READ(IPIJEZ,359) (NELP(jj,II,INP),jj=1,4)
+!                READ(IPIJEZ,361) NELP(5,II,INP)
+!           write(3,*)"NELP read",II,(NELP(ji,II,INP),ji=1,5)
+! !             write(3,*)"dpoint",DPOINT_ID(I),DP_ELEMENT(I)
+            ENDDO
+          enddo
+!            endif
+   20  format (I1)
+   21  format (I2)
+  355  FORMAT(I10)
+  356  FORMAT(23I10)
+  358  FORMAT(2I10,6F10.2,I10)
+  360  FORMAT(2I10,6F10.2,10X,I10)
+  359  FORMAT(4I10)
+  361  FORMAT(210X,I5)
+ 1000  FORMAT(A250)
+ 1117  FORMAT(21I10,2I5,E10.3,I5)
+       RETURN
+      END
+C=======================================================================
+       SUBROUTINE READPRESEKALL (ISNUMER)
+        USE PRESEK
+        USE ELEMENTS
+        IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+        COMMON /DJERDAP/ IDJERDAP,ISPRESEK
+        COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
+!         DIMENSION NP3D1(5),NDJEL(21)
+        CHARACTER*250 ACOZ
+        CHARACTER*20 IME
+        CHARACTER*2 IMECSV
+        CHARACTER*1 IMECSV1,PREF
+!         CHARACTER*4 PRESECI(18,3)
+!        DATA PRESECI/2,1,12/
+       IPIJEZ=250
+        IME='L-ALL.PRE'
+         write(*,*) "IME ",IME
+        OPEN (IPIJEZ,FILE=IME,STATUS='UNKNOWN',FORM='FORMATTED',
+     1      ACCESS='SEQUENTIAL')
+         READ(IPIJEZ,355) IPRES
+         IIPRES=IPRES
+!          IPRES=IIPRES
+         if (.not.allocated(NPRESEK)) 
+     1              allocate(NPRESEK(IIPRES),STAT=istat)
+         if (.not.allocated(NPELEM)) 
+     1              allocate(NPELEM(IIPRES),STAT=istat)
+!          if(IPRES.GT.24)THEN
+!           READ(IPIJEZ,356) (NPRESEK(I),I=1,24)
+!           READ(IPIJEZ,356) (NPELEM(I),I=1,24)
+!           READ(IPIJEZ,356) (NPRESEK(I),I=25,IIPRES)
+!           READ(IPIJEZ,356) (NPELEM(I),I=25,IIPRES)
+!          ELSE
+          READ(IPIJEZ,1010) (NPRESEK(I),I=1,IIPRES)
+          READ(IPIJEZ,1010) (NPELEM(I),I=1,IIPRES)
+!          ENDIF
+         MAXNP=NPRESEK(1)
+         MAXELP=NPELEM(1)
+         IF(IIPRES.GT.1) THEN
+           do INP=2,IIPRES
+             IF(MAXNP.LT.NPRESEK(INP)) MAXNP=NPRESEK(INP)
+             IF(MAXELP.LT.NPELEM(INP)) MAXELP=NPELEM(INP)
+           enddo
+         ENDIF
+!           write(*,*)"IPRES,MAXNP,MAXELP",IIPRES,MAXNP,MAXELP
+!            if (NPRESEK.eq.0) STOP 'nisu definisani cvorovi u preseku'
+              if (.not.allocated(NP_ID)) 
+     1              allocate(NP_ID(MAXNP,IIPRES),STAT=istat)
+              if (.not.allocated(NP_ELEMENT)) allocate(NP_ELEMENT
+     1                                 (MAXNP,IIPRES),STAT=istat)
+              if (.not.allocated(NP_COORDS)) allocate(NP_COORDS
+     1                               (6,MAXNP,IIPRES),STAT=istat)
+              if (.not.allocated(NPROP)) allocate(NPROP
+     1                                 (MAXNP,IIPRES),STAT=istat)
+              if (.not.allocated(NELP)) allocate(NELP
+     1                             (5,MAXELP,IIPRES),STAT=istat)
+         do INP=1,IIPRES
+!            write(*,*)"NPRESEK(INP),NPELEM",NPRESEK(INP),NPELEM(INP)
+!           write(*,*)"IPRES",INP
+           DO I=1,NPRESEK(INP)
+            IF(IPAKT.eq.0) THEN
+             READ(IPIJEZ,360) NP_ID(I,INP),NP_ELEMENT(I,INP),
+     1             (NP_COORDS(jj,I,INP),jj=1,6),NPROP(I,INP)
+            ELSEIF(IPAKT.eq.1) THEN
+             READ(IPIJEZ,358) NP_ID(I,INP),NP_ELEMENT(I,INP),
+     1             (NP_COORDS(jj,I,INP),jj=1,6),NPROP(I,INP)
+            ENDIF
+!        write(3,*)"NP_ID(I)",NP_ID(I,INP),NP_ELEMENT(I,INP),NPROP(I,INP)
+            IF(ISNUMER.EQ.1) THEN
+               NNMP=NP_ELEMENT(I,INP)
+               JJ=NNMP-NMI+1
+            IF(NNMP.LT.NMI.OR.NNMP.GT.NMA.OR.MELCV(JJ).EQ.0) THEN
+            write(*,*) 'pre', INP,NP_ID(I,INP),I,NNMP,'van modela'
+                STOP 
+                ENDIF
+                  NP_ELEMENT(I,INP)=MELCV(JJ)
+              ENDIF
+            ENDDO
+! C elementi u kojima se stampaju vrednosti za prikaz rezultata
+!             if (NPELEM.eq.0) STOP 'nisu definisani elementi u preseku'
+            DO II=1,NPELEM(INP)
+               READ(IPIJEZ,1000) ACOZ
+               READ(ACOZ,359) (NELP(jj,II,INP),jj=1,4)
+               READ(ACOZ,361) NELP(5,II,INP)
+!               write(*,*)"NPELEM",NPELEM(INP),II
+!                READ(IPIJEZ,359) (NELP(jj,II,INP),jj=1,4)
+!                READ(IPIJEZ,361) NELP(5,II,INP)
+            ENDDO
+          enddo
+!            endif
+   20  format (I1)
+   21  format (I2)
+  355  FORMAT(I10)
+  356  FORMAT(24I10)
+  358  FORMAT(2I10,6F10.2,I10)
+  360  FORMAT(2I10,6F10.2,10X,I10)
+  359  FORMAT(4I10)
+  361  FORMAT(210X,I5)
+ 1000  FORMAT(A250)
+ 1010  FORMAT(10I10)
+ 1117  FORMAT(21I10,2I5,E10.3,I5)
+       RETURN
+      END
+C=======================================================================
