@@ -1,0 +1,17 @@
+﻿  TSValue.cpp
+  TimeSeries.cpp
+g:\pakvwindows\cplusplus\timeseries.cpp(13): warning C4244: 'argument': conversion from 'time_t' to 'double', possible loss of data
+g:\pakvwindows\cplusplus\timeseries.cpp(25): warning C4244: 'argument': conversion from 'time_t' to 'double', possible loss of data
+g:\pakvwindows\cplusplus\timeseries.cpp(35): warning C4267: 'return': conversion from 'size_t' to 'int', possible loss of data
+g:\pakvwindows\cplusplus\timeseries.cpp(45): warning C4101: 'i': unreferenced local variable
+g:\pakvwindows\cplusplus\timeseries.cpp(164): warning C4244: '=': conversion from 'double' to 'time_t', possible loss of data
+g:\pakvwindows\cplusplus\timeseries.cpp(228): warning C4101: 'm': unreferenced local variable
+g:\pakvwindows\cplusplus\timeseries.cpp(228): warning C4101: 'y': unreferenced local variable
+  pakTimeSeries.cpp
+  Generating Code...
+  sparse_assembler.c
+g:\pakvwindows\cplusplus\sparse_assembler.c(399): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type 'int64_t'
+  g:\pakvwindows\cplusplus\sparse_assembler.c(399): note: consider using '%lld' in the format string
+  g:\pakvwindows\cplusplus\sparse_assembler.c(399): note: consider using '%Id' in the format string
+  g:\pakvwindows\cplusplus\sparse_assembler.c(399): note: consider using '%I64d' in the format string
+  cplusplus.vcxproj -> G:\pakVwindows\x64\Debug\cplusplus.lib

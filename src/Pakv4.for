@@ -7,6 +7,7 @@ C==========================================================================
       COMMON /VDP/ DT,NKORP,NN,NZAV
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /SRPSKI/ ISRPS
+      COMMON /PRIKAZ/ INDSC,IZPOT
       DIMENSION VREME(NPER,950)
 
       DO I=1,NPER
@@ -21,6 +22,7 @@ C
       CALL ISPITA(ACOZ)
       READ(ACOZ,1004) NKORP,DT
  1004 FORMAT (I5,D10.3)
+       IF(INDSC.EQ.2.OR.INDSC.EQ.1) go to 20
       IF(ISRPS.EQ.0)
      *WRITE(IIZLAZ,4002) NKORP,DT
       IF(ISRPS.EQ.1)
@@ -31,6 +33,7 @@ C
  5002 FORMAT(//
      111X,'NUMBER OF STEPS IN PERIOD ................... NKORP =',I5/
      111X,'TIME STEP IN PERIOD ......................... DT  =',1PD10.3)
+ 20      CONTINUE
       DO J=1,NKORP
         VREME(I,J)=DT
       ENDDO
@@ -48,6 +51,7 @@ C==========================================================================
       COMMON /VREPER/ NPER,NTABFT
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /SRPSKI/ ISRPS
+      COMMON /PRIKAZ/ INDSC,IZPOT
 
       CHARACTER*250 ACOZ
 
@@ -64,10 +68,12 @@ C==========================================================================
        DO J=1,IMAX
        CALL ISPITA(ACOZ)
        READ(ACOZ,1004) TABF(1,IBR,J),TABF(2,IBR,J)
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) go to 20
       IF(ISRPS.EQ.0)
      *WRITE(IIZLAZ,4002) TABF(1,IBR,J),TABF(2,IBR,J)
       IF(ISRPS.EQ.1)
      *WRITE(IIZLAZ,5002) TABF(1,IBR,J),TABF(2,IBR,J)
+ 20      continue
        ENDDO
       ENDDO
       RETURN
@@ -407,7 +413,9 @@ C
       END
 C==========================================================================
 C==========================================================================
-      SUBROUTINE PREB(TT21,TT1,ID,NEL,NBREL)
+      SUBROUTINE PREB(TT21,TT1,NBREL)
+      USE NODES
+      USE ELEMENTS
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 
       COMMON /NUMNPT/ NUMZAD,NPT,NDIM,MAXSIL,JEDN,NWK,NET
@@ -415,7 +423,8 @@ C==========================================================================
       COMMON /NDESUK/ NDES,IDPRIT,IFORM
       COMMON /NELDIM/ NDIMEL
 
-      DIMENSION ID(1,*),NEL(NDIMM,*),TT21(*),TT1(*)
+!       DIMENSION ID(1,*),NEL(NDIMM,*),TT21(*),TT1(*)
+      DIMENSION TT21(*),TT1(*)
 
       DO KLM=1,NDIMEL
          JED=ID(1,NEL(KLM,NBREL))
@@ -1296,29 +1305,32 @@ C=======================================================================
       
 !        WRITE(3,*) "IND",IND
 !  Djerdap
-!       IF(Y.LT.Y1) THEN
-!         W=Y/Y1
-!         TS=0.5*(TM+TW1)
-!         IF(TS.LE.0) TS=0
-!         TM=TS*(1-W)+TW1*W
-!       ELSEIF(Y.GE.Y1.AND.Y.LE.Y2) THEN
-!         W=(Y-Y1)/(Y2-Y1)
-!         TM=TW1*(1-W)+TW2*W
-!       ELSE
-!         TM=TW2
-!       ENDIF
-!       IF(IND.EQ.1) THEN
-!         W=D_BOFANG/Y1
-!         TD=TS*(1-W)+TW1*W
-!         TM=0.5*(TS+TD)
-! !         WRITE(3,*) "D,Y1,TS,TW1,TM",D_BOFANG,Y1,TS,TW1,TM
-!       ENDIF  
-      DELILAC=(1-exp(-Alpha*Y1))*exp(-Alpha*Y2)
-      DELILAC=DELILAC-(1-exp(-Alpha*Y2))*exp(-Alpha*Y1)
-      CKOEF=(TW1*exp(-Alpha*Y2)-TW2*exp(-Alpha*Y1))/DELILAC
-      TS=TW2*(1-exp(-Alpha*Y1))-TW1*(1-exp(-Alpha*Y2))
-      TS=TS/DELILAC
-      TM=CKOEF+(TS-CKOEF)*exp(-Alpha*Y)
+      IF(Y.LT.Y1) THEN
+        W=Y/Y1
+        TS=0.5*(TM+TW1)
+        IF(TS.LE.0) TS=0
+        TM=TS*(1-W)+TW1*W
+      ELSEIF(Y.GE.Y1.AND.Y.LE.Y2) THEN
+        W=(Y-Y1)/(Y2-Y1)
+        TM=TW1*(1-W)+TW2*W
+      ELSE
+        TM=TW2
+      ENDIF
+      IF(IND.EQ.1) THEN
+        TS=0.5*(TM+TW1)
+        W=D_BOFANG/Y1
+        TD=TS*(1-W)+TW1*W
+        TM=0.5*(TS+TD)
+!         WRITE(3,*) "D,Y1,TS,TW1,TM",D_BOFANG,Y1,TS,TW1,TM
+      ENDIF  
+!  Grancarevo
+!       DELILAC=(1-exp(-Alpha*Y1))*exp(-Alpha*Y2)
+!       DELILAC=DELILAC-(1-exp(-Alpha*Y2))*exp(-Alpha*Y1)
+!       CKOEF=(TW1*exp(-Alpha*Y2)-TW2*exp(-Alpha*Y1))/DELILAC
+!       TS=TW2*(1-exp(-Alpha*Y1))-TW1*(1-exp(-Alpha*Y2))
+!       TS=TS/DELILAC
+!       TM=CKOEF+(TS-CKOEF)*exp(-Alpha*Y)
+!  Grancarevo kraj      
 !         WRITE(3,*) "Y1,TS,TW1,TM",Y1,TS,TW1,TM
         
       RETURN
@@ -1384,17 +1396,17 @@ C=======================================================================
          PRINT*, "OUT OF INTERPOLATION SEGMENTS"
          STOP
         END SELECT
+!           WRITE(3,*) "FK1,Fx1,Fx2",FK1,Fx1,Fx2
 
       RETURN
       END
 C=======================================================================
-      SUBROUTINE PREDF_INTERP(I,INTERPAXIS,NUMAXISPOINTS,INTAXISPOINT,
-     1                 ITFMAX,NZAD,AXISPTCORD,CORD,TABF,VVREME,FK1,IND)
-      integer*4 NZAD(3,*),ITFMAX(*),I,INTERPAXIS,IND
-      integer*8 ILOC,INDLOC,NSEG,NUMAXISPOINTS,INTAXISPOINT(2,*)
+      SUBROUTINE PREDF_INTERP(I,NZAD,CORD,FK1,IND)
+      integer*4 NZAD(3,*),I,IAXIS,IND
+!       integer*8 ILOC,INDLOC,NSEG,NUMAXISPOINTS
                          
-      double precision AXISPTCORD(*),CORD(3,*),VVREME,FK1,TABF
-      double precision Fkf1,Fx2,Fn1,Fakt,Akonst,Cin
+      double precision CORD(3,*),FK1
+      double precision Fkf1,Fx2,Fn1,Fakt,Akonst,Cin,y1,y2
       
 !       DO ILOC=2,NUMAXISPOINTS
 !          IF(AXISPTCORD(1).GE.CORD(INTERPAXIS,NZAD(1,I))) THEN
@@ -1406,30 +1418,36 @@ C=======================================================================
 !             INDLOC=3
 !             EXIT
 !          ENDIF
+        IAXIS=2
         IF(IND.EQ.1) THEN
-          Fakt=30.0
+          Fakt=80.0
           Akonst=301.0
           Cin=0.332
+          y1=125.0
+          y2=500.0
         ELSEIF(IND.EQ.2) THEN
-          Fakt=80.0
+          Fakt=30.0
           Akonst=0.0
           Cin=1.0
+          y1=150.0
+          y2=500.0
         ENDIF
-        IF(AXISPTCORD(1).LE.CORD(INTERPAXIS,NZAD(1,I)).AND.
-     1         AXISPTCORD(2).GE.CORD(INTERPAXIS,NZAD(1,I))) THEN
+!         IF(AXISPTCORD(1).LE.CORD(INTERPAXIS,NZAD(1,I)).AND.
+!      1         AXISPTCORD(2).GE.CORD(INTERPAXIS,NZAD(1,I))) THEN
 !             INDLOC=2
 !             NSEG=ILOC-1
-         Fkf1=Fakt/(AXISPTCORD(1)-AXISPTCORD(2))
-         CALL TIMFUN(TABF,Fx2,VVREME,ITFMAX(INTAXISPOINT(2,2))
-     1                                      ,INTAXISPOINT(2,2))
-         Fn1=Akonst+Cin*Fx2-
-     1        Fakt*AXISPTCORD(1)/(AXISPTCORD(1)-AXISPTCORD(2))
-         FK1=Fkf1*CORD(INTERPAXIS,NZAD(1,I))+Fn1
-        ELSE
-         PRINT*, "OUT OF INTERPOLATION SEGMENTS"
-        STOP
-!             EXIT
-        ENDIF
+!          Fkf1=Fakt/(AXISPTCORD(1)-AXISPTCORD(2))
+!          CALL TIMFUN(TABF,Fx2,VVREME,ITFMAX(INTAXISPOINT(2,2))
+!      1                                      ,INTAXISPOINT(2,2))
+         Fkf1=Fakt/(y1-y2)
+         Fn1=Akonst+Cin*FK1-Fkf1*y1
+!          Write(3,*) 'Fkf1,Fn1,FK1', Fkf1,Fn1,FK1
+         FK1=Fkf1*CORD(IAXIS,NZAD(1,I))+Fn1
+!         ELSE
+!          PRINT*, "OUT OF INTERPOLATION SEGMENTS"
+!         STOP
+! !             EXIT
+!         ENDIF
 !        ENDDO
 !         WRITE(3,*) "INDLOC",INDLOC
 

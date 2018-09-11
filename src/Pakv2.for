@@ -1,7 +1,8 @@
 C$DEBUG      
 C==========================================================================
 C==========================================================================
-      SUBROUTINE MAXATE(MAXA,MHT,ID,NE,NTE,JEDN,LM,NWK)
+      SUBROUTINE MAXATE(MAXA,MHT,NE,NTE,JEDN,LM,NWK)
+      USE NODES
       USE ELEMENTS
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 C
@@ -12,7 +13,7 @@ C
       COMMON /DODAT/ NDIMM
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
 C
-      DIMENSION MAXA(*),MHT(*),LM(*),ID(1,*)
+      DIMENSION MAXA(*),MHT(*),LM(*)
       COMMON /CDEBUG/ IDEBUG
       integer*8 LM
 
@@ -31,6 +32,7 @@ C      ENDDO
        MHT(I)=0
        MAXA(I)=0
       ENDDO
+!        write(*,*) "u MAXATE, pre petlje po el"
 
       DO 100 NLM=1,NE
       IF(elemtip(NLM).gt.100) THEN
@@ -45,6 +47,7 @@ C      ENDDO
          DO 2 I=1,NDIMEL
             IF(NEL(I,NLM).EQ.0) GO TO 2
             N=NEL(I,NLM)
+!         write(*,*) "NEL(I,NLM)",I,NLM,NEL(I,NLM),ID(J,N)
                DO 1 J=1,1
                   IF(ID(J,N).LE.0) GO TO 1
                   KK=KK+1
@@ -69,6 +72,7 @@ C         WRITE(IIZLAZ,*)'MHT(II),II',MHT(II),II
    20    CONTINUE
 C
   100 CONTINUE
+!        write(*,*) "u MAXATE, posle petlje po el"
 C
 CS    VEKTOR MAXA
 CE    VECTOR MAXA
@@ -1804,8 +1808,8 @@ CE OPEN OUTPUT FILE
       COMMON /SRPSKI/ ISRPS
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /IMEULZ/ PAKLST,PAKUNV,ZSILE,PAKNEU,IDUZIN,ZTEMP
-      CHARACTER *24 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
-      CHARACTER*1 IME*20,STAT*3
+      CHARACTER *54 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
+      CHARACTER*1 IME*50,STAT*3
       LOGICAL OLDNEW
       COMMON /CDEBUG/ IDEBUG
       IF(IDEBUG.GT.0) PRINT *, ' OTVIZL'
@@ -1957,23 +1961,36 @@ C
  5000 FORMAT(14I5)
       END
 C=======================================================================
-      SUBROUTINE ULAZT1(ID,CORD,NPT,JEDN)
+      SUBROUTINE ULAZT1(ISNUMER)
+      USE NODES
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /PRIKAZ/ INDSC,IZPOT
       COMMON /SRPSKI/ ISRPS
-      CHARACTER*250 ACOZ
       COMMON /ICITANJE/INPT
-      DIMENSION ID(1,*),CORD(3,*)
+      COMMON /NUMNPT/ NUMZAD,NPT,NDIM,MAXSIL,JEDN,NWK,NET
+      CHARACTER*250 ACOZ
+!       DIMENSION ID(1,*),CORD(3,*)
       JEDN=0
+      ICVOR=0
+      NPA=0
+      NPI=0
+      write(*,*) 'ulazt1,ISNUMER', ISNUMER
       DO 10 I=1,NPT
       CALL ISPITA(ACOZ)
+!       IF(INPT.EQ.1)THEN
+!        READ(ACOZ,1017) N,NJEDN,(CORD(J,N),J=1,3),KORC
+!       ELSE
+!        READ(ACOZ,1007) N,NJEDN,(CORD(J,N),J=1,3),KORC
+!       ENDIF
       IF(INPT.EQ.1)THEN
-       READ(ACOZ,1017) N,NJEDN,(CORD(J,N),J=1,3),KORC
+       READ(ACOZ,1017) N,NJEDN,(CORD(J,I),J=1,3),KORC
       ELSE
-       READ(ACOZ,1007) N,NJEDN,(CORD(J,N),J=1,3),KORC
+       READ(ACOZ,1007) N,NJEDN,(CORD(J,I),J=1,3),KORC
       ENDIF
-      IF(N.GT.NPT) STOP 'NE RADI SLOBODNA NUMERACIJA (N.GT.NPT)'
+!       IF(N.GT.NPT) STOP 'NE RADI SLOBODNA NUMERACIJA (N.GT.NPT)'
+      IF((N.GT.NPT).AND.(ISNUMER.EQ.0)) 
+     * STOP 'ISNUMER=0 (N.GT.NPT)'
 C==========================================================================
 C SAMO PRIVREMENO ZBOG GLEDANJA SLOBODNE POVRSINE U PRAVCU OSE Y
 C MORA SE PROMENITI OSA Z SA OSOM Y
@@ -1982,20 +1999,41 @@ C      CORD(1,N)=X
 C      CORD(2,N)=Z
 C      CORD(3,N)=-Y
 C==========================================================================
-      IF (NJEDN.EQ.0) THEN
+        IF (NJEDN.EQ.0) THEN
           JEDN=JEDN+1
-          ID(1,N)=JEDN
+          ID(1,I)=JEDN
         ELSE
-          ID(1,N)=0
+          ID(1,I)=0
+        ENDIF
+      IF(ISNUMER.EQ.1) THEN 
+!       ELSEIF(ISNUMER.EQ.1) THEN 
+!         ICVOR=ICVOR+1
+        IF(I.EQ.1) THEN
+          NPA=N
+          NPI=N
+        ELSE
+          IF(NPA.LT.N) NPA=N
+          IF(NPI.GT.N) NPI=N
+        ENDIF
+        IF (NJEDN.EQ.0) NCVEL(I)=N
+!           JEDN=JEDN+1
+!           ID(1,I)=JEDN
+!           NCVEL(I)=N
+!         ELSE
+!           ID(1,I)=0
+!         ENDIF
       ENDIF
    10 CONTINUE
-      IF(INDSC.EQ.2) RETURN
+!       do ii=1,NPT
+!            write(IIZLAZ,*) ii,ID(1,ii),NCVEL(ii)
+!       enddo
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
 !       Write(*,*) "indsc ulazt1", INDSC
  1007 FORMAT(I5,3X,I2,3F10.5,I5)
  1017 FORMAT(I10,3X,I2,3F10.5,I5)
 C 1008 FORMAT(I5,3X,I2,3E12.5,I5)
- 1008 FORMAT(I5,3X,I2,3X,3(F10.3),I5)
- 1018 FORMAT(I10,3X,I2,3X,3(F10.3),I5)
+ 1008 FORMAT(I5,2X,I6,3X,3(F10.3),I5)
+ 1018 FORMAT(I10,2X,I6,3X,3(F10.3),I5)
       IF(ISRPS.EQ.0)
      *WRITE(IIZLAZ,2000)
       IF(ISRPS.EQ.1)
@@ -2006,11 +2044,20 @@ C 1008 FORMAT(I5,3X,I2,3E12.5,I5)
      *'NODE, D.O.F., C O O R D I N A T E S   O F   N O D E'/)
       DO 12 I=1,NPT
       IF (ID(1,I).EQ.0) JJ=1
-      IF (ID(1,I).NE.0) JJ=0
+!       IF (ID(1,I).NE.0) JJ=0
+      IF (ID(1,I).NE.0) JJ=ID(1,I)
       IF(INPT.EQ.1) THEN
-       WRITE(IIZLAZ,1018) I,JJ,(CORD(J,I),J=1,3),KORC
+       IF(ISNUMER.EQ.0) THEN 
+        WRITE(IIZLAZ,1018) I,JJ,(CORD(J,I),J=1,3),KORC
+       ELSE
+      WRITE(IIZLAZ,1018) NCVEL(I),ID(1,I),(CORD(J,I),J=1,3),KORC
+       ENDIF
       ELSE
-       WRITE(IIZLAZ,1008) I,JJ,(CORD(J,I),J=1,3),KORC
+       IF(ISNUMER.EQ.0) THEN 
+        WRITE(IIZLAZ,1008) I,JJ,(CORD(J,I),J=1,3),KORC
+       ELSE
+       WRITE(IIZLAZ,1008) NCVEL(I),JJ,(CORD(J,I),J=1,3),KORC
+       ENDIF
       ENDIF
    12 CONTINUE
       RETURN
@@ -2043,7 +2090,8 @@ C
        ENDIF
       IF(NN.GT.NET) STOP 'NE RADI SLOBODNA NUMERACIJA (NN.GT.NET)'
    20 CONTINUE
-      IF(INDSC.EQ.2) RETURN
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
+!       IF(INDSC.EQ.2) RETURN
  1007 FORMAT(5I5,F10.5)
  1008 FORMAT(6I5,F10.5)
  1009 FORMAT(4I6,F10.5)
@@ -2089,7 +2137,8 @@ C
        ENDIF
       IF(NN.GT.NET) STOP 'NE RADI SLOBODNA NUMERACIJA (NN.GT.NET)'
    20 CONTINUE
-      IF(INDSC.EQ.2) RETURN
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
+!       IF(INDSC.EQ.2) RETURN
  1008 FORMAT(12I5)
  1009 FORMAT(24I6)
  1010 FORMAT(6X,24I6)
@@ -2110,7 +2159,7 @@ C
 C==========================================================================
 
 C==========================================================================
-      SUBROUTINE ULAZR3()
+      SUBROUTINE ULAZR3(ISNUMER)
       USE ELEMENTS
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /NUMNPT/ NUMZAD,NPT,NDIM,MAXSIL,JEDN,NWK,NET
@@ -2134,8 +2183,11 @@ C
       DO i=1,6
        eltypes(i)=0
       ENDDO
-      
+      IELEM=0
+      NMA=0
+      NMI=0
       DO 20 J=1,NET
+      IELEM=IELEM+1
       CALL ISPITA(ACOZ)
       IF(INPT.EQ.1) THEN
         READ(ACOZ,1006) NETIP
@@ -2151,7 +2203,8 @@ C
       ENDIF
       eltypes(NTMP)=NETIP
       NETIP=NTMP
-
+!  nema slobodne numeracije elemenata
+      IF(ISNUMER.EQ.0) THEN
       IF(INPT.EQ.1) THEN
 c      READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN)
 !       READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN),NEL(NDIMM,NN)
@@ -2186,6 +2239,53 @@ c      READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN)
         STOP
        END SELECT
       ENDIF
+      IF(NN.GT.NET) STOP 'ISNUMER=0 (NN.GT.NET)'
+      ELSEIF(ISNUMER.EQ.1) THEN
+       IF(INPT.EQ.1) THEN
+c      READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN)
+!       READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN),NEL(NDIMM,NN)
+      SELECT CASE (NETIP)
+       CASE(1)
+        READ(ACOZ,1117) NN,(NEL(I,j),I=1,NDIMM-2),NEL(NDIMM-1,j),
+     1                  NEL(NDIMM,j),thick(j),elemtip(j)
+       CASE(2)
+        READ(ACOZ,1117) NN,(NEL(I,j),I=1,NDIMM-2),NEL(NDIMM-1,j),
+     1                  NEL(NDIMM,j),thick(j),elemtip(j)
+       CASE(3)
+        READ(ACOZ,1117) NN,(NEL(I,j),I=1,NDIMM-2),NEL(NDIMM-1,j),
+     1                  NEL(NDIMM,j),tmp,elemtip(j)
+       CASE DEFAULT
+        WRITE(*,*) 'ELEMENT TYPE UNKNOWN NETIP=',NETIP
+        STOP
+      END SELECT
+      ELSE
+      SELECT CASE (NETIP)
+       CASE(1)
+!       READ(ACOZ,1008) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN),NEL(NDIMM,NN)
+        READ(ACOZ,1007) NN,(NEL(I,j),I=1,NDIMM-2),NEL(NDIMM-1,j),
+     1                  NEL(NDIMM,j),thick(j),elemtip(j)
+       CASE(2)
+        READ(ACOZ,1007) NN,(NEL(I,j),I=1,NDIMM-2),NEL(NDIMM-1,j),
+     1                  NEL(NDIMM,j),thick(j),elemtip(j)
+       CASE(3)
+        READ(ACOZ,1007) NN,(NEL(I,j),I=1,NDIMM-2),NEL(NDIMM-1,j),
+     1                  NEL(NDIMM,j),tmp,elemtip(j)
+       CASE DEFAULT
+        WRITE(*,*) 'ELEMENT TYPE UNKNOWN NETIP=',NETIP
+        STOP
+       END SELECT
+      ENDIF
+         MCVEL(J)=NN
+!          NI=NN
+         IF(J.EQ.1) THEN
+            NMA=NN
+            NMI=NN
+         ELSE
+            IF(NMA.LT.NN) NMA=NN
+            IF(NMI.GT.NN) NMI=NN
+         ENDIF
+         NN=J
+      ENDIF
 !        IF(NP2DMX.GT.8) THEN
 !          CALL ISPITA(ACOZ)
 !          IF(INPT.EQ.1) THEN
@@ -2194,7 +2294,7 @@ c      READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN)
 !            READ(ACOZ,1008) (NEL(I,NN),I=9,NDIMM-2)
 !          ENDIF
 !        ENDIF
-      IF(NN.GT.NET) STOP 'NE RADI SLOBODNA NUMERACIJA (NN.GT.NET)'
+!       IF(NN.GT.NET) STOP 'NE RADI SLOBODNA NUMERACIJA (NN.GT.NET)'
    20 CONTINUE
       numeltip=0
       do i=1,6
@@ -2209,7 +2309,7 @@ c      READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN)
         enddo
        endif
       enddo
-      IF(INDSC.EQ.2) RETURN
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
 !       do i=1,6
 !         write(*,*) 'eltypes(',i,')',eltypes(i)
 !       enddo
@@ -2248,27 +2348,58 @@ c      READ(ACOZ,1118) NN,(NEL(I,NN),I=1,8),NEL(NDIMM-1,NN)
 C==========================================================================
 
 C==========================================================================
-      SUBROUTINE ULAZT3(NZAD,ZADVRE,NUMZAD,ID,NZADJ)
+      SUBROUTINE ULAZT3(NZAD,ZADVRE,NZADJ,ISNUMER)
+      USE NODES
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
       COMMON /SRPSKI/ ISRPS
       COMMON /ICITANJE/INPT
       COMMON /PRIKAZ/ INDSC,IZPOT
+      COMMON /NUMNPT/ NUMZAD,NPT,NDIM,MAXSIL,JEDN,NWK,NET
       CHARACTER*250 ACOZ
-      DIMENSION NZAD(3,*),ZADVRE(*),ID(1,*),NZADJ(*)
+      DIMENSION NZAD(3,*),ZADVRE(*),NZADJ(*)
+      INTEGER NN,NI,N
 C
       DO 28 I=1,NUMZAD
       CALL ISPITA(ACOZ)
       IF(INPT.EQ.1) THEN
-        READ(ACOZ,1022) NZAD(1,I),NZAD(2,I),NZAD(3,I),ZADVRE(I)
+        READ(ACOZ,1022) NN
       ELSE
-        READ(ACOZ,1012) NZAD(1,I),NZAD(2,I),NZAD(3,I),ZADVRE(I)
+        READ(ACOZ,1012) NN
+      ENDIF
+      IF(ISNUMER.EQ.0) THEN
+         NI=NN
+         IF(NN.LE.0.OR.NN.GT.NPT) THEN
+      IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN
+      IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN
+            STOP ' PROGRAM STOP - PAKV2 - ULAZT3'
+         ENDIF
+      ELSE
+         N=NN-NPI+1
+         NI=NELCV(N)
+         IF(NI.EQ.0.OR.NN.LT.NPI.OR.NN.GT.NPA) THEN
+      IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2100) NN
+      IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6100) NN
+            STOP ' PROGRAM STOP - PAKV2 - ULAZT3'
+         ENDIF
+      ENDIF
+      NZAD(1,I)=NI
+      IF(INPT.EQ.1) THEN
+        READ(ACOZ,1122) NZAD(2,I),NZAD(3,I),ZADVRE(I)
+      ELSE
+        READ(ACOZ,1112) NZAD(2,I),NZAD(3,I),ZADVRE(I)
       ENDIF
       NZADJ(I)=ID(1,NZAD(1,I))
   28  CONTINUE
-      IF(INDSC.EQ.2) RETURN
- 1012 FORMAT(3I5,F10.3)
- 1022 FORMAT(I10,2I5,F10.3)
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
+ 1012 FORMAT(I5)
+ 1022 FORMAT(I10)
+ 1112 FORMAT(5X,2I5,F10.3)
+ 1122 FORMAT(10X,2I5,F10.3)
       IF(ISRPS.EQ.0)
      *WRITE(IIZLAZ,1101)
       IF(ISRPS.EQ.1)
@@ -2283,6 +2414,10 @@ C
 !       write(*,*) 'iz ulazt3 ID(1,NZAD(1,',I,'))',ID(1,NZAD(1,I))
   32  CONTINUE
  1013 FORMAT (I20,I10,I14,10X,F10.3)
+ 2100 FORMAT(//' GRESKA U UCITAVANJU ZADATIH POT/TEMP'/
+     1' CVOR',I10,' NE POSTOJI'//' PROGRAM STOP - PAK051 - FSPOLJ'//)
+ 6100 FORMAT(//' ERROR IN INPUT DATA ABOUT PRESCRIBE POT/TEM'/
+     1' NODE',I10,' NOT EXIST'//' PROGRAM STOP - PAK051 - FSPOLJ'//)
       RETURN
       END
 C==========================================================================
@@ -2331,7 +2466,8 @@ C
 !         ENDIF
       ENDDO
       endif
-      IF(INDSC.EQ.2) RETURN
+      IF(INDSC.EQ.2.OR.INDSC.EQ.1) RETURN
+!       IF(INDSC.EQ.2) RETURN
  1012 FORMAT(2I5,F10.3)
  1022 FORMAT(2I10,F10.3)
       IF(ISRPS.EQ.0)
@@ -2817,3 +2953,148 @@ C
       END
 C=======================================================================
 
+! C=======================================================================
+!       SUBROUTINE TRAZI (N,INCVOR,isrednji)
+!       USE NODE
+!       
+!       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+!       COMMON /CDEBUG/ IDEBUG
+!       integer*8 idonji, igornji,isrednji  
+!       
+!       idonji=1
+!       igornji=N
+!       DO WHILE (idonji.LE.igornji)
+!          isrednji=(igornji+idonji)/2
+!          IF(ID_NODE(isrednji).EQ.INCVORE) RETURN
+!          IF(INCVORE.LT.ID_NODE(isrednji)) THEN
+!             igornji=isrednji-1
+!          ELSE
+!             idonji=srednji+1
+!          ENDIF
+!       END DO
+!       STOP 'nije nadjen id cvora' 
+!       END
+! C=======================================================================
+C======================================================================
+      SUBROUTINE VEZACV(NP)
+      USE NODES
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+C
+C ......................................................................
+C .
+CE.   P R O G R A M
+CE.      TO CONECT NUMBERS NODES IN FREE NUMERATION
+CS.   P R O G R A M
+CS.        ZA VEZU BROJEVA CVOROVA I NJIHOVOG REDNOG BROJA U VEKTORU
+CS.        BROJEVA CVOROVA U SLOBODNOJ NUMERACIJI
+C .
+CE.    V E C T O R S
+CE.               NCVEL(NP) - VECTOR NUMBER OF NODES
+CE.        NELCV(NPA-NPI+1) - VECTOR CONECT NUMBER OF NODES
+CS.    V E K T O R I
+CS.               NCVEL(NP) - VEKTOR BROJEVA CVOROVA
+CS.        NELCV(NPA-NPI+1) - VEKTOR VEZE BROJEVA CVOROVA I NJIHOVOG
+CS.                           REDNOG BROJA U VEKTORU BROJEVA CVOROVA
+C .
+C ......................................................................
+C
+!        DIMENSION NCVEL(*),NELCV(*)
+      COMMON /CDEBUG/ IDEBUG
+C
+      IF(IDEBUG.GT.0) PRINT *, 'PAKV2 - VEZACV'
+      DO 10 I=1,NP
+         J=NCVEL(I)
+         J=J-NPI+1
+         NELCV(J)=I
+   10 CONTINUE
+      RETURN
+      END
+C======================================================================
+C=======================================================================
+      SUBROUTINE VEZAEL(NE)
+      USE ELEMENTS
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+C
+C ......................................................................
+C .
+CE.   P R O G R A M
+CE.      TO CONECT NUMBERS ELEMENTS IN FREE NUMERATION
+CS.   P R O G R A M
+CS.      ZA POVEZIVANJE BROJEVA ELEMENATA U SLOBODNOJ NUMERACIJI
+C .
+CE.    V E C T O R S                                                   
+CE.               MCVEL(NE) - VECTOR NUMBER OF ELEMENTS       
+CE.        MELCV(NMA-NMI+1) - VEKCOR CONECT NUMBER OF ELEMENT
+CS.    V E K T O R I                                                   
+CS.               MCVEL(NE) - VEKTOR BROJEVA ELEMENATA                
+CS.        MELCV(NMA-NMI+1) - VNDIMM,IELEMEKTOR VEZE BROJEVA ELEMENATA I NJIHOVOG  
+CS.                           REDNOG BROJA U VEKTORU BROJEVA ELEMENATA  
+C .
+C ......................................................................
+C
+      COMMON /CDEBUG/ IDEBUG
+!       DIMENSION MCVEL(*),MELCV(*)
+C
+      IF(IDEBUG.GT.0) PRINT *, 'PAKV2 - VEZAEL'
+      DO 10 I=1,NE
+         J=MCVEL(I)
+         J=J-NMI+1
+         MELCV(J)=I
+   10 CONTINUE
+      RETURN
+      END
+C======================================================================
+C=======================================================================
+      SUBROUTINE VEZACE(NE,NDIMM)
+      USE NODES
+      USE ELEMENTS
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+C
+C ......................................................................
+C .
+CE.   P R O G R A M
+CE.      TO CONECT NUMBERS NODES ELEMENTS IN FREE NUMERATION
+CS.   P R O G R A M
+CS.      ZA POVEZIVANJE BROJEVA CVOROVA ELEMENATA U SLOBODNOJ NUMERACIJI
+C .
+C ......................................................................
+C
+      COMMON /SRPSKI/ ISRPS
+      COMMON /CDEBUG/ IDEBUG
+      COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
+!       DIMENSION NELCV(*),NEL(NE,*)
+C
+      IF(IDEBUG.GT.0) PRINT *, 'PAKV2 - VEZACE'
+!        write(*,*) "NDIMM",NDIMM
+!        write(*,*) " EL(1,2)",NEL(1,2)
+      DO 20 I=1,NE
+         DO 10 J=1,NDIMM
+            N=NEL(J,I)
+            IF(N.LE.0)GO TO 10
+            NN=N
+            IF(N.EQ.0) GO TO 10
+            IF(N.GE.NPI.AND.N.LE.NPA) THEN
+               N=NN-NPI+1
+            ENDIF
+            K=NELCV(N)
+!       write(*,*) "I,J,NEL(J,I),NELCV(N)", I,J, NEL(J,I),NEL(1,2)
+            IF(K.EQ.0) THEN
+      IF(ISRPS.EQ.0)
+     1WRITE(IZLAZ,2000) I,NN
+      IF(ISRPS.EQ.1)
+     1WRITE(IZLAZ,6000) I,NN
+      STOP ' PROGRAM STOP - PAKV2 - VEZACE'
+            ENDIF
+            NEL(J,I)=K
+   10    CONTINUE
+   20 CONTINUE
+      RETURN
+C-----------------------------------------------------------------------
+ 2000 FORMAT(//' GRESKA U UCITAVANJU ULAZNIH PODATAKA O ELEMENTIMA'/
+     1,I5,' CVOR',I5,' NE POSTOJI'//' PROGRAM STOP - PAKV2 - VEZACE'//)
+C-----------------------------------------------------------------------
+ 6000 FORMAT(//' ERROR IN INPUT DATA ABOUT ELEMENTS'/,I5,
+     1' NODE',I5,' NOT EXIST'//' PROGRAM STOP - PAKV2 - VEZACE'//)
+C-----------------------------------------------------------------------
+      END
+C======================================================================

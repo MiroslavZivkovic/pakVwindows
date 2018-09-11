@@ -58,7 +58,7 @@ C=========================================================================
 C
       DIMENSION KONT(5,MAXLIN,*),KOJK(*)
 
-      DIMENSION X(9),Y(9),TT21(44),TT210(44),QUK(20),QUM(20),CORDY(4)
+      DIMENSION X(9),Y(9),TT21(44),TT210(44),CORDY(4)
       DIMENSION R(3,3),S(3,3),W(3,3)
       DIMENSION RK(3,3),SK(3,3),WK(3,3)
       DIMENSION H(9),ZVHX(9),ZVHY(9),HP(4)
@@ -729,7 +729,7 @@ C
 C RACUNANJE PROTOKA DUZ KONTURE UNUTAR MREZE
 C
       IF (NKONT.GT.0) THEN
-        CALL RKONTUR(TT1,ID,KONT,NEL,AKONST,QUK,QUM,CORD)
+        CALL RKONTUR(TT1,ID,KONT,NEL,AKONST,CORD)
       ENDIF
 C
 C  PETLJA PO ELEMENTIMA
@@ -866,7 +866,7 @@ C
 C
       WRITE(IIZLAZ,*)'PERIOD NUMBER ',NNPER         
       IF (KKORAK.GT.0) THEN
-      CALL IZLLST(ID,TT1,KKORAK,VECTJ,QUK,QUM,VVREME,FZAPR,VG,GG,NEL,
+      CALL IZLLST(ID,TT1,KKORAK,VECTJ,VVREME,FZAPR,VG,GG,NEL,
      1            KOTES)
       CALL STAGP1(TT1,ID,NASLOV,VVREME,KKORAK,1,NPT,18,0,NET,NEL,
      1            KORAK,VECTJ,CORD,GRADJN,FZAPR,NZAD,UBRZ)
@@ -895,7 +895,7 @@ C
 C=======================================================================
 C=======================================================================
 
-      SUBROUTINE IZLLST(ID,TT1,KKORAK,VECTJ,QUK,QUM,VVREME,FZAPR,VG,GG,
+      SUBROUTINE IZLLST(ID,TT1,KKORAK,VECTJ,VVREME,FZAPR,VG,GG,
      1                  NEL,KOTES)
       USE KONTURE
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
@@ -913,7 +913,7 @@ C=======================================================================
       COMMON /SILEZAP/ FZAP(2,9)
       COMMON /ICITANJE/INPT
       
-      DIMENSION D4(4),TT1(*),VECTJ(2,*),QUK(20),QUM(20),ID(1,*),N4(4)
+      DIMENSION D4(4),TT1(*),VECTJ(2,*),ID(1,*),N4(4)
       DIMENSION FZAPR(2,*),NRED(4),NREDK(4),NEL(NDIMM,*)
       DIMENSION VG(3,NET,*),GG(3,NET,*)
       DATA NRED/4,2,1,3/ 
@@ -1157,7 +1157,7 @@ C
 C RACUNANJE PROTOKA DUZ KONTURE UNUTAR MREZE
 C
 C=========================================================================
-      SUBROUTINE RKONTUR(TT1,ID,KONT,NEL,AKONST,QUK,QUM,CORD)
+      SUBROUTINE RKONTUR(TT1,ID,KONT,NEL,AKONST,CORD)
       USE KONTURE
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
 C
@@ -1181,7 +1181,7 @@ C
 C
       DIMENSION KONT(5,MAXLIN,*),NEL(NDIMM,*),ID(1,*)
       DIMENSION AFIFI(9,9),AM1(9,9),AK(9,9),TT1(*),CORD(3,*)
-      DIMENSION AKONST(3,5,*),QPR(9),QUK(20),QUM(20)
+      DIMENSION AKONST(3,5,*),QPR(9)
 C
       R(3,1)=-0.7745966692415
       R(3,2)=0.0
@@ -1326,7 +1326,7 @@ C
 C
       DIMENSION KONT(5,MAXLIN,*),NEL(NDIMM,*)
       DIMENSION VECTJ(2,*),CORD(3,*)
-      DIMENSION QUK(1000),QUM(1000),NRED(4)
+      DIMENSION NRED(4)
       DIMENSION VG(3,NET,*)
       DATA NRED/4,2,1,3/ 
 C

@@ -20,12 +20,21 @@
         double precision,dimension(:),allocatable :: thick
         integer,dimension(:),allocatable :: elemtip
         integer :: numeltip
+        integer :: NMA
+        integer :: NMI
         integer,dimension(6) :: eltypes
         integer,dimension(:,:),allocatable :: NEL
+        integer,dimension(:),allocatable :: MCVEL
+        integer,dimension(:),allocatable :: MELCV
       end module ELEMENTS
       
       module NODES
-        integer*8,dimension(:,:),allocatable :: ID
+!         integer :: ISNUMER
+        integer :: NPA
+        integer :: NPI
+        integer,dimension(:,:),allocatable :: ID
+        integer,dimension(:),allocatable :: NCVEL
+        integer,dimension(:),allocatable :: NELCV
         double precision, dimension(:,:),allocatable :: CORD
       end module NODES
       
@@ -36,6 +45,7 @@
       
       module PREDISCRIBED
         integer*8,dimension(:),allocatable :: NZADC
+        double precision,dimension(:),allocatable :: POTZADC
         integer*8,dimension(:,:),allocatable :: NELTOK
         integer*8,dimension(:,:),allocatable :: NELR
         integer*8 :: MAXTQE
@@ -112,6 +122,9 @@
       
       module KONTURE
         integer*8,dimension(:),allocatable :: LIN
+        integer,dimension(:),allocatable :: LINSN
+        double precision,dimension(:),allocatable :: QUK
+        double precision,dimension(:),allocatable :: QUM
       end module KONTURE
  
       module pflux
@@ -119,3 +132,17 @@
         double precision,dimension(:),allocatable :: FCONEL
         double precision,dimension(:),allocatable :: TOKOLINEL
       end module pflux
+      
+      module PRESEK
+        integer*4,dimension(:),allocatable :: NPRESEK
+        integer*4 :: IPRES
+        integer*4,dimension(:,:),allocatable :: NP_ELEMENT
+        integer*4,dimension(:,:),allocatable :: NP_ID
+        double precision,dimension(:,:,:),allocatable :: NP_COORDS
+        integer*4,dimension(:),allocatable :: NPELEM
+        integer*4,dimension(:,:,:),allocatable :: NELP
+        integer*4,dimension(:,:),allocatable :: NPROP
+!         integer :: NUMMAT
+!         double precision,dimension(:,:),allocatable :: EPRESEK
+!         integer*8,dimension(:),allocatable :: EL_TYPE
+      end module PRESEK
