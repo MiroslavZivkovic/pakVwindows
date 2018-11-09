@@ -3286,7 +3286,8 @@ C
       PI=4.D0*DATAN(1.D0)
             
 C===========================================================================
-      IAXIS=6
+
+            IAXIS=6
 C
       INULTO=0
       KKORAK=1
@@ -4951,7 +4952,7 @@ cz ide na sledeci korak
 C=======================================================================
 C=======================================================================
       SUBROUTINE IZLL3DT(TT1,KORAK,VECTJ,VVREME,VG,GG,
-     1                  KOTES,ISNUMER)
+     1                  KOTES,ISNUMBER)
       USE NODES
       USE ELEMENTS
       USE KONTURE
