@@ -1,0 +1,78 @@
+C /1/ HEADING CARD (80A1)
+C NASLOV
+  Untitled
+C /2/ FORMAT FOR INPUT DATA (free format)
+C INDFOR
+    2    1         1
+C /3/ BASIC DATA FOR THE PROBLEM (10I5)
+C NP,               NPER,NPRINT,NSTAC,IVDP
+         8                   1    0    1    0
+C /4/ BASIC DATA FOR THE PROBLEM (4I5,2F10.0,I5)
+C              MAXIT,EPSTA,EPSTR,NJRAP
+                   0  0.000000  0.000000    0
+C /5/ DATA FOR RESTART (3I5,D15.8)
+C IREST
+    0  -11
+C /6/ DATA FOR TIME STEPS (2I5,F10.0)
+C   NKDT(I),DTDT(I)    (I=1,NPER)
+    1  1.000000
+C /7/ DATA FOR NODAL POINT DATA (I5,3X,I2,3F10.2,10X,I5)
+C N,IDT(N),CORD(N,1),CORD(N,2),CORD(N,3),KORC
+         1    0 -50.00000 -50.00000 100.00000              0
+         2    0  50.00000 -50.00000 100.00000              0
+         3    0  50.00000  50.00000 100.00000              0
+         4    0 -50.00000  50.00000 100.00000              0
+         5    0  50.00000 -50.00000   0.00000              0
+         6    0 -50.00000 -50.00000   0.00000              0
+         7    0 -50.00000  50.00000   0.00000              0
+         8    0  50.00000  50.00000   0.00000              0
+C /8/ ELEMENT GROUP DATA (4I5)
+C NETIP,NET,INDAX,HEIGHT,RADIUS
+    3         1    0  0.000000  0.000000
+C /8-3/ DATA FOR 3D ELEMENT GROUP (8I5)
+C a) Card with data about 3D element
+C NMAT3d,MAT3D,NP3DMX,IPR3DC,IPRTG3,NGAUSX,NGAUSY,NGAUSZ
+    1    0    8    0    0    2    2    2
+C b) Data for each element in group (15I5)
+C NN,(NEL(NN,I),I=1,8),NMAT,NQQ,KORE,NBEG,IPRCO,IPGS
+C Midnodes for 3D element (13I5)
+C (NEL(NN,I),I=9,21)
+    7    2    5    8    3    1    6    7    4    1    0    0    0    0    0
+C /9/ DATA ABOUT DEPENDENCE OF MATERIAL CONSTANTS ON TEMPERATURE (6I5)
+C NANLK,NTABK,MAXTK,NANLC,NTABC,MAXTC
+    0    1    0    0
+C /9-1/ DATA ABOUT MATERIALS (3I5,6F10.0)
+C IBFK(I,1),IBFK(I,2),IBFK(I,3),FAKP(I,1),FAKP(I,2),FAKP(I,3),GUSM(I),TOPM(I),TMNM(I)
+    1    0    0  0.000000  0.000000  0.000000  0.000000 2000.0000  0.000000
+C /9-2/ TABLES OF DEPENDENCE: CONDUCTION COEFFICIENT-TEMPERATURE
+C a) Number of points in table for material set
+C NN,NTAKV(NN)
+    1    0
+C b) Table of values temperature-conduction coefficient
+C (TABK(K,NN,J),K=1..)
+    1    0
+C /10/ DATA ABOUT TIME FUNCTIONS (2I5)
+C NTABFT,MAXTFT
+    1  100
+C a) data about function in a table form (2I5)
+C IBR,IMAX    (IMAX.LE.MAXTFT)
+    1    0
+C b) values for argument - function (2F10.0)
+C ((FN(I,IBR,J),I=1,2),J=1,IMAX)
+C /11/ DATA FOR PRESCRIBED TEMPERATURE (2I5,F10.2,I5)
+C N,NC,FAK,KORC
+    1    1   25.0000    0
+    2    1   25.0000    0
+    3    1   55.0000    0
+    4    1   55.0000    0
+    5    1   25.0000    0
+    6    1   25.0000    0
+    7    1   55.0000    0
+    8    1   55.0000    0
+C /12/ DATA ABOUT INITIAL VALUES AND BOUNDARY CONDITIONS (11I5)
+C NPOC,NQP,MAXTQP,NHP,MAXTHP,NTOK,MAXTOK,NQE,MAXTQE,NHR,MAXTHR
+    0    0    0    0    0    0    0    0    0    0    0
+C EMPTY CARD
+
+C /16/ FINAL CARD (A4)
+STOP

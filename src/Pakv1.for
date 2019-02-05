@@ -53,6 +53,7 @@ C
       COMMON /SOLVER/ ISOLVER
       COMMON /NXNAST/ NXNASTRAN
       COMMON /DJERDAP/ IDJERDAP,ISPRESEK
+      COMMON /INDBRANA/ IBRANA
       COMMON /STAMPAZT/ NPRINT
 C
 C    DEFINISANJE MAKSIMALNE RADNE MEMORIJE U VEKTORU A
@@ -88,6 +89,7 @@ C      DIMENSION IBFK(5,3),FAKP(5,3),TOPM(5),TMNM(5)
       integer ierr, myid
       integer*8 LM2,INDWATER
       integer Dtime(8),ISNUMER
+      INTEGER*4 IBRANA
 
       CALL MPI_INIT(ierr)
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
@@ -125,18 +127,20 @@ C
       IPROTK=21
       IZSILE=25
 C
-C==========================================================================
+C=======================================================================
       CALL OTVORI
       CALL DATE_AND_TIME(VALUES=Dtime)
       WRITE(*,*) 'posle otvaranja dat fajla', (Dtime(i),i=5,7)
       CALL ISPITA(ACOZ)                                       
       READ(ACOZ,1000) NASLOV
  1000 FORMAT(A80)
-C==========================================================================
+C=======================================================================
       CALL ISPITA(ACOZ)                                       
-      READ(ACOZ,1001) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK
+      READ(ACOZ,1001) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK,
+     * IBRANA
  1001 FORMAT(14I5)
-C==========================================================================
+      write (*,*) 'IBRANA',IBRANA
+C=======================================================================
       CALL ISPITA(ACOZ)                                       
       IF(INPT.EQ.1) THEN
        READ(ACOZ,1022) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,NULAZ,
@@ -168,9 +172,11 @@ C==========================================================================
       CALL OTVNEU
       WRITE(IIZLAZ,3019) NASLOV
       IF(ISRPS.EQ.0)
-     *WRITE(IIZLAZ,3020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK
+     *WRITE(IIZLAZ,3020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK,
+     * IBRANA
       IF(ISRPS.EQ.1)
-     *WRITE(IIZLAZ,7020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK
+     *WRITE(IIZLAZ,7020) INDFOR,INPT,NXNASTRAN,IPAKT,IDJERDAP,ISPRESEK,
+     * IBRANA
  3019 FORMAT(//78('*')/,A80,/78('*')///)
 
  3020 FORMAT(//
@@ -191,8 +197,12 @@ C==========================================================================
      116X,'EQ.0; STAMPA U SVIM CVOROVIMA'/
      116X,'GE.1; STAMPA U CVOROVIMA ZA LAMELU'/
      111X,'STAMPANJE REZULTATA U PRESECIMA .............ISPRESEK =',I5/
+     116X,'EQ.1; stampa se presek za lamelu IDJERDAP'/
      116X,'EQ.0; NE STAMPAJU SE'/
-     116X,'EQ.1; STAMPAUJU SE ZA SVE PREEKE'///)
+     116X,'EQ.-1; STAMPAUJU SE ZA SVE PRESEKE za Djerdap'/
+     111X,'Indikator brane za interpolaciju temp ..........IBRANA =',I5/
+     116X,'EQ.0; Djerdap'/
+     116X,'EQ.1; Grancarevo'///)
  7020 FORMAT(//
      111X,'FORMAT INDIKATOR .............................. INDFOR =',I5/
      116X,'EQ.0; INDFOR = 1'/
@@ -212,7 +222,10 @@ C==========================================================================
      116X,'GE.1; ONLY FOR LAMELE'/
      111X,'WRITE RESULTS IN CROSS SECTION ..............ISPRESEK =',I5/
      116X,'EQ.0; NO'/
-     116X,'EQ.1; YES'///)
+     116X,'EQ.-1; all cross section for dam Djerdap'/
+     111X,'INDICATOR for interpolation temp     ..........IBRANA =',I5/
+     116X,'EQ.0; Djerdap'/
+     116X,'EQ.1; Grancarevo'///)
 C
       IF(ISRPS.EQ.0)
 C     *WRITE(IIZLAZ,2001) NPT,NGET,NMATT,NDIN,NPER,NPRINT,NSTAC,IANIZ
@@ -414,6 +427,7 @@ C==========================================================================
       CALL ISPITA(ACOZ)
 C      READ(ACOZ,1006) NMAT2D,MAT2D,NP2DMX,PENALT
       READ(ACOZ,1006) NMAT2D,MAT2D,NP2DMX,INDJOT
+      write(*,*)'INDJOT',INDJOT
 C 1006 FORMAT(3I5,D10.3)
  1006 FORMAT(4I5)
 C      IF(NMAT2D.GT.1) MAT2D=0
@@ -613,6 +627,8 @@ C UCITAVANJE POCETNIH VREDNOSTI I SPECIFICNE GUSTINE GAMA
       IF(IPAKT.EQ.0) THEN
          READ(ACOZ,1014) POCU,POCV,POCP,GAMA,IOSA,ISIL,IFIL,ZASIC,IPOR
          IF(ZASIC.LT.1.D-10) ZASIC=0.999
+!       WRITE(*,*)'filtracione sile se racun. u zavisnosti od poroznosti'
+!          IPOR=1
          IF(ISRPS.EQ.0)
      *      WRITE(IIZLAZ,3008)GAMA,IOSA,ISIL,IFIL,ZASIC,IPOR
          IF(ISRPS.EQ.1)
@@ -747,7 +763,7 @@ C ucitavanje elemenata na kojima je zadata radijacija
      1        STAT=istat) 
             CALL ULA3D4SENZORI()
           ENDIF 
-          IF(IBOFANG.EQ.1) THEN
+          IF(IBOFANG.GE.1) THEN
             CALL ISPITA(ACOZ)
             READ(ACOZ,1988) Rd_BOFANG,D_BOFANG,Alpha
           ENDIF
@@ -1250,7 +1266,7 @@ CN      ENDIF
 !          write(*,*) "stampanje perioda"
         CALL NEUTRA(A(LVREME),NPER,NASLOV,1,IFILE)
         ENDDO
-      ELSEIF(ISPRESEK.EQ.-1)THEN
+      ELSEIF(ISPRESEK.LE.-1)THEN
         CALL READPRESEKALL (ISNUMER)
 ! otvaranje neu fajlova za stampanje rezultata za preseke
         DO IPR=1,IPRES
@@ -1258,95 +1274,103 @@ CN      ENDIF
          IFILE=IFILE+IPR
        SELECT CASE (IPR)
        CASE (1)
-          IMEPR='L1-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L1-O-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-OB-F.NEU'    
        CASE (2)
-          IMEPR='L1-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L1-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-X1-F.NEU'    
        CASE (3)
-          IMEPR='L2-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L2-O-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-X2-F.NEU'    
        CASE (4)
-          IMEPR='L2-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L2-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-X3-F.NEU'    
        CASE (5)
-          IMEPR='L3-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L3-O-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-X4-F.NEU'    
        CASE (6)
-          IMEPR='L3-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L3-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-X5-F.NEU'    
        CASE (7)
-          IMEPR='L4-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L4-O-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-X6-F.NEU'    
        CASE (8)
-          IMEPR='L4-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L4-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-2) IMEPR='V-X7-F.NEU'    
        CASE (9)
-          IMEPR='L5-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L5-O-F.NEU'    
        CASE (10)
-          IMEPR='L5-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L5-OB-F.NEU'    
        CASE (11)
-          IMEPR='L6-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L6-O-F.NEU'    
        CASE (12)
-          IMEPR='L6-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L6-OB-F.NEU'    
        CASE (13)
-          IMEPR='L7-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L7-O-F.NEU'    
        CASE (14)
-          IMEPR='L7-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L7-OB-F.NEU'    
        CASE (15)
-          IMEPR='L8-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L8-O-F.NEU'    
        CASE (16)
-          IMEPR='L8-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L8-OB-F.NEU'    
        CASE (17)
-          IMEPR='L9-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L9-O-F.NEU'    
        CASE (18)
-          IMEPR='L9-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L9-OB-F.NEU'    
        CASE (19)
-          IMEPR='L10-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L10-O-F.NEU'    
        CASE (20)
-          IMEPR='L10-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L10-OB-F.NEU'    
        CASE (21)
-          IMEPR='L11-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L11-O-F.NEU'    
        CASE (22)
-          IMEPR='L11-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L11-OB-F.NEU'    
        CASE (23)
-          IMEPR='L12-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L12-O-F.NEU'    
        CASE (24)
-          IMEPR='L12-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L12-OB-F.NEU'    
        CASE (25)
-          IMEPR='L13-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L13-O-F.NEU'    
        CASE (26)
-          IMEPR='L13-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L13-OB-F.NEU'    
        CASE (27)
-          IMEPR='L14-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L14-O-F.NEU'    
        CASE (28)
-          IMEPR='L14-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='L14-OB-F.NEU'    
        CASE (29)
-          IMEPR='PB-OB-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='PB-OB-F.NEU'    
        CASE (30)
-          IMEPR='EL-OA-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='EL-OA-F.NEU'    
        CASE (31)
-          IMEPR='SIII-A6-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SIII-A6-F.NEU'    
        CASE (32)
-          IMEPR='SIII-A5-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SIII-A5-F.NEU'    
        CASE (33)
-          IMEPR='SIII-OA-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SIII-OA-F.NEU'    
        CASE (34)
-          IMEPR='SII-A4-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SII-A4-F.NEU'    
        CASE (35)
-          IMEPR='SII-A3-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SII-A3-F.NEU'    
        CASE (36)
-          IMEPR='SII-OA-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SII-OA-F.NEU'    
        CASE (37)
-          IMEPR='SII-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SII-O-F.NEU'    
        CASE (38)
-          IMEPR='SI-A2-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SI-A2-F.NEU'    
        CASE (39)
-          IMEPR='SI-A1-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SI-A1-F.NEU'    
        CASE (40)
-          IMEPR='SI-OA-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SI-OA-F.NEU'    
        CASE (41)
-          IMEPR='MB-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='MB-O-F.NEU'    
        CASE (42)
-          IMEPR='MB-OA-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='MB-OA-F.NEU'    
        CASE (43)
-          IMEPR='MB-CS-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='MB-CS-F.NEU'    
        CASE (44)
-          IMEPR='SI-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SI-O-F.NEU'    
        CASE (45)
-          IMEPR='SIII-O-F.NEU'    
+          IF(ISPRESEK.EQ.-1) IMEPR='SIII-O-F.NEU'    
       CASE DEFAULT
       END SELECT
 !          write(*,*),"IFILE,IME ",IFILE,IMEPR
@@ -1435,6 +1459,7 @@ C     1,LVG,LGG,LKOJK
       ENDIF
       IF (myid.ne.0) goto 1345
 !          WRITE(*,*) "isave",isave
+        write(*,*) "posle RACN3D"
 !  stampa za pakt temperature u tab fajlove
       IF(IPAKT.EQ.1)THEN
       DO IMP=1,MAX_MPOINTS
@@ -1448,13 +1473,16 @@ C     1,LVG,LGG,LKOJK
 !         WRITE(*,*) "INDMPI",INDMPI
 !         WRITE(*,*) "MPOINT_ID(",IMP,")",MPOINT_ID(IMP)
 !top WINDOWS START      
+!         write(*,*) "IMP", IMP
           if (.not.allocated(MP_RESULTS_NIZ)) allocate(MP_RESULTS_NIZ
      1                               (BRKORAKA),STAT=istat)
        do i=1,BRKORAKA
+!         write(*,*) "pre save koorak", I
              MP_RESULTS_NIZ(i) = MP_RESULTS(i,IMP+1)
            enddo    
                  CALL save_series(MPOINT_ID(IMP),MP_VREME,
      1             MP_RESULTS_NIZ,BRKORAKA,MAX_MPOINTS,IMP,INDMPI,isave)
+!         write(*,*) "posle save koorak", I
         if (allocated(MP_RESULTS_NIZ)) deallocate(MP_RESULTS_NIZ)
 C      zile asus linux
 !top WINDOWS END       
@@ -1469,7 +1497,7 @@ c          enddo
 !busarac LINUX END     
       ENDDO
       ENDIF
-        write(*,*) "posle RACN3D"
+!         write(*,*) "posle MPOINT"
 !  kada ima preseka yatvaranje neu fajla
       IF((ISPRESEK.GT.0).OR.(ISPRESEK.EQ.-1)) THEN
         DO IPR=1,IPRES
@@ -1564,7 +1592,7 @@ C
 !            IF(IDJERDAP.EQ.1) THEN
 !  kad je IDJERDAP > 0 zapisuje temperature za cvorove iz fajla DJ1 ...
           IFILE=105
-          IFILE=IFILE+IDJERDAP+KKORAK
+!           IFILE=IFILE+IDJERDAP+KKORAK
 !            IF(IDJERDAP.GE.1) THEN
 !              DO IK=1,1
 !                IFILE=IFILE+IDJERDAP
@@ -1618,6 +1646,7 @@ C
 !           ENDIF
 !          ENDDO
 C      WRITE (II) VREME,(TEMP(I),I=1,NP)
+      close (IFILE)
  5007 FORMAT(I5,1PE13.5)
  5017 FORMAT(I10,1PE13.5)
       RETURN

@@ -52,6 +52,7 @@
         integer*8 :: MAXER
         integer*8 :: NWATERS
         integer*8 :: NSENSORS
+        integer*8 :: IBOFANG
         double precision :: Alpha
         double precision :: Rd_BOFANG
         double precision :: D_BOFANG
@@ -146,3 +147,6 @@
 !         double precision,dimension(:,:),allocatable :: EPRESEK
 !         integer*8,dimension(:),allocatable :: EL_TYPE
       end module PRESEK
+      module zapresil
+        double precision,dimension(:),allocatable :: SILEL
+      end module zapresil

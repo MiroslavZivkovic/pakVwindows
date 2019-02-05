@@ -126,8 +126,10 @@ C
         RETURN
        ENDIF
       ENDDO
-       WRITE(IIZLAZ,*)'GRESKA U ULAZNIM PODACIMA ZA VREM. FUNKCIJU',IFUN
-       WRITE(IIZLAZ,*)'VREME JE IZVAN OPSEGA VREMENSKE FUNKCIJE', UVREME
+      WRITE(IIZLAZ,*)'GRESKA U ULAZNIM PODACIMA ZA VREM. FUNKCIJU',IFUN
+      WRITE(IIZLAZ,*)'VREME JE IZVAN OPSEGA VREMENSKE FUNKCIJE', UVREME
+      WRITE(*,*)'VREME JE IZVAN OPSEGA VREMENSKE FUNKCIJE',IFUN, UVREME
+      STOP
       END
 C==========================================================================
 C==========================================================================
@@ -1300,39 +1302,50 @@ C=======================================================================
 C=======================================================================
       SUBROUTINE LININTGV(Y1,Y2,TW1,TW2,TM,IND,Y)
       USE PREDISCRIBED
-      INTEGER*4 IND
+      COMMON /INDBRANA/ IBRANA
+      INTEGER*4 IND,IBRANA
       DOUBLE PRECISION FTOK,Y1,Y2,TW1,TW2,TM,TS,Y,CKOEF,DELILAC
       
-!        WRITE(3,*) "IND",IND
+!         WRITE(3,*) "pakv4, Ibrana",IBRANA
 !  Djerdap
-      IF(Y.LT.Y1) THEN
-        W=Y/Y1
-        TS=0.5*(TM+TW1)
-        IF(TS.LE.0) TS=0
-        TM=TS*(1-W)+TW1*W
-      ELSEIF(Y.GE.Y1.AND.Y.LE.Y2) THEN
-        W=(Y-Y1)/(Y2-Y1)
-        TM=TW1*(1-W)+TW2*W
-      ELSE
-        TM=TW2
-      ENDIF
-      IF(IND.EQ.1) THEN
-        TS=0.5*(TM+TW1)
-        W=D_BOFANG/Y1
-        TD=TS*(1-W)+TW1*W
-        TM=0.5*(TS+TD)
-!         WRITE(3,*) "D,Y1,TS,TW1,TM",D_BOFANG,Y1,TS,TW1,TM
-      ENDIF  
+      IF(IBRANA.EQ.0) THEN
+        IF(Y.LT.Y1) THEN
+          W=Y/Y1
+          TS=0.5*(TM+TW1)
+          IF(TS.LE.0) TS=0
+          TM=TS*(1-W)+TW1*W
+        ELSEIF(Y.GE.Y1.AND.Y.LE.Y2) THEN
+          W=(Y-Y1)/(Y2-Y1)
+          TM=TW1*(1-W)+TW2*W
+        ELSE
+          TM=TW2
+        ENDIF
+        IF(IND.EQ.1) THEN
+          TS=0.5*(TM+TW1)
+          W=D_BOFANG/Y1
+          TD=TS*(1-W)+TW1*W
+          TM=0.5*(TS+TD)
+!           WRITE(3,*) "D,Y1,TS,TW1,TM",D_BOFANG,Y1,TS,TW1,TM
+        ENDIF  
 !  Grancarevo
-!       DELILAC=(1-exp(-Alpha*Y1))*exp(-Alpha*Y2)
-!       DELILAC=DELILAC-(1-exp(-Alpha*Y2))*exp(-Alpha*Y1)
-!       CKOEF=(TW1*exp(-Alpha*Y2)-TW2*exp(-Alpha*Y1))/DELILAC
-!       TS=TW2*(1-exp(-Alpha*Y1))-TW1*(1-exp(-Alpha*Y2))
-!       TS=TS/DELILAC
-!       TM=CKOEF+(TS-CKOEF)*exp(-Alpha*Y)
-!  Grancarevo kraj      
-!         WRITE(3,*) "Y1,TS,TW1,TM",Y1,TS,TW1,TM
-        
+      ELSEIF(IBRANA.EQ.1) THEN
+         IF(IBOFANG.EQ.1) THEN
+           DELILAC=0.0
+           DELILAC=(1-exp(-Alpha*Y1))*exp(-Alpha*Y2)
+           DELILAC=DELILAC-(1-exp(-Alpha*Y2))*exp(-Alpha*Y1)
+           CKOEF=(TW1*exp(-Alpha*Y2)-TW2*exp(-Alpha*Y1))/DELILAC
+           TS=TW2*(1-exp(-Alpha*Y1))-TW1*(1-exp(-Alpha*Y2))
+           TS=TS/DELILAC
+           TM=CKOEF+(TS-CKOEF)*exp(-Alpha*Y)
+        ELSEIF(IBOFANG.EQ.2) THEN
+!  TW2 - temperatura na povrsini akumulacije        
+!  TW1 - temperatura na dnu akumulacije        
+           TM=TW1+(TW2-TW1)*exp(-Alpha*Y)
+        ENDIF
+!  Granc arevo kraj 
+!         WRITE(3,*) "Alpha,DELILAC,CKOEF,TS",Alpha,DELILAC,CKOEF,TS
+!         WRITE(3,*) "Y1,Y2,TW1,TW2,TM,IND,Y",Y1,Y2,TW1,TW2,TM,IND,Y
+      ENDIF
       RETURN
       END
 C=======================================================================

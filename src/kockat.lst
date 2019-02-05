@@ -1,0 +1,197 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+            PPPPPPPPP         AAAA        KK      KK     PPPPPPPPP
+            PPPPPPPPPP       AAAAAA       KK     KK      PPPPPPPPPP
+            PP      PP      AA    AA      KK    KK       PP      PP
+            PP      PP     AA      AA     KK   KK        PP      PP
+            PPPPPPPPPP     AA      AA     KK  KK         PPPPPPPPPP
+            PPPPPPPPP      AA      AA     KKKKK          PPPPPPPPP
+            PP             AAAAAAAAAA     KKKKKKK        PP
+            PP             AAAAAAAAAA     KK    KK       PP
+            PP             AA      AA     KK     KK      PP
+            PP             AA      AA     KK      KK     PP
+
+
+
+
+
+
+   ---------------------------  VERZIJA  1.00  ---------------------------
+
+
+                              MASINSKI FAKULTET
+                              UL. S. JANJICA 6
+                              34000 KRAGUJEVAC
+                              SRBIJA-JUGOSLAVIJA
+
+
+
+ posle otvaranja dat fajla          15          32           4
+
+
+******************************************************************************
+  Untitled                                                                      
+******************************************************************************
+
+
+
+
+
+           FORMAT INDIKATOR .............................. INDFOR =    2
+                EQ.0; INDFOR = 1
+                EQ.1; FREE FORMAT
+                EQ.2; FIXED FORMAT, AS DESCRIBED
+
+
+           Num. NODE GREAT FROM 99999 ....................   INPT =    1
+                EQ.0; NO
+                EQ.1; YES
+
+
+           BROJ CITANJE POTENCIJALA SA DISKA .......... NXNASTRAN =    0
+                EQ.0; NO
+                EQ.1; YES
+
+
+           START PROGRAM PAKP/PAKT ........................ IPAKT =    1
+                EQ.0; PAKP
+                EQ.1; PAKT
+
+
+           WRITE FIL.FORCE/TEMP IN NODES FOR LAMELE ....IDJERDAP =    0
+                EQ.0; IN ALL NODES
+                GE.1; ONLY FOR LAMELE
+           WRITE RESULTS IN CROSS SECTION ..............ISPRESEK =    0
+                EQ.0; NO
+                EQ.1; YES
+
+
+
+      O S N O V N I    P O D A C I    O    P R O B L E M U
+      ---------------------------------------------------
+
+
+           UKUPAN BROJ CVORNIH TACAKA ....................... NP =         8
+                EQ.0; PREKIDA SE IZVRSAVANJE PROGRAMA
+
+
+           BROJ PERIODA SA KONSTANTNIM VREMENSKIM KORACIMA . NPER =    1
+                EQ.0; POSTAJE "1"; (MAX. 16 PERIODA)
+
+
+           DEFINISANJE STAMPARSKOG KORAKA ................ NPRINT =    1
+                EQ.0; POSTAJE "1"
+
+
+           INDIKATOR STACIONARNOSTI ....................... NSTAC =    1
+                EQ.0; NESTACIONARNA ANALIZA
+                EQ.1; STACIONARNA ANALIZA
+                EQ.2; PRVI KORAK STACIONARAN A DRUGI NESTACIONARNI
+
+
+           INDIKATOR SLOBODNE NUMERACIJE ................ ISNUMER =    0
+                EQ.0; NE
+                EQ.1; DA
+
+
+
+           TIME INTEGRATION METHOD USED ................... INTEB =    1
+                EQ.0; DEFAULT SET "1"
+                EQ.1; EULER BACKWARD INTEGRATION (ALPFA = 1)
+
+
+           PRINT OF RESULTS IN PRESCRIBED NODES ........... INDSC =    0
+                EQ.0; IN ALL NODES
+                EQ.1; IN PRESCRIBED NODES
+
+
+           PRINT OF RESULTS IN PRESCRIBED FORMAT .......... IFORM =    0
+                EQ.0; IN FORMAT  D13.5
+                EQ.1; IN FORMAT  F10.3
+
+
+           MAXIMUM NUMBER OF ITERATIONS ................... MAXIT =   15
+                EQ.0; DEFAULT SET "15"
+
+
+           ABSOLUTE ACCURACY AT ITERATIONS ........... EPSTA = 0.000D+00
+
+
+           RELATIVE ACCURACY AT ITERATIONS ........... EPSTR = 1.000D-03
+                EQ.0; DEFAULT SET "1.E-3"
+
+
+           ITERATION METHODS EMPLOYED ..................... NJRAP =    1
+                EQ.0; DEFAULT SET "1"
+                EQ.1; MODIFIED NEWTON
+                EQ.2; FULL NEWTON
+
+
+
+           INDICATOR FOR JOB EXECUTION .................... IREST =    0
+                EQ.0; JOB EXECUTION
+                EQ.1; CHECK OF INPUT DATA
+           VRSTA SOLVERA ................................ ICCGG =  -11
+
+
+
+
+           NUMBER OF STEPS IN PERIOD ................... NKORP =    1
+           TIME STEP IN PERIOD ......................... DT  = 1.000D+00
+
+
+NODE, D.O.F., C O O R D I N A T E S   O F   N O D E
+
+         1       1      -50.000   -50.000   100.000    0
+         2       2       50.000   -50.000   100.000    0
+         3       3       50.000    50.000   100.000    0
+         4       4      -50.000    50.000   100.000    0
+         5       5       50.000   -50.000     0.000    0
+         6       6      -50.000   -50.000     0.000    0
+         7       7      -50.000    50.000     0.000    0
+         8       8       50.000    50.000     0.000    0
+
+
+
+
+           ELEMENT TYPE FOR GROUP      1 .................. NETIP =    3
+                EQ.2; ISOPARAMETRIC 2D ELEMENT IN PLANE X-Y
+                EQ.3; ISOPARAMETRIC 3D ELEMENT
+
+
+           NUMBER OF ELEMENTS IN THE GROUP      1 .......... NET =         1
+                GT.0; 
+
+
+           INDICATOR FOR AXISYMMETRIC ELEMENTS     1 ...... INDAX =    0
+                (ONLY FOR 2D ELEMENTS)
+                EQ.0; 2D IN PLANE X-Y
+                EQ.1; 2D AXISYMMETRIC, Y IS AXIS OF SYMMETRY 
+
+
+           HEIGH OF SURFACE WITH PRESCRIBED FLUX .... HEIGHT = 0.00000D+00
+
+
+           DISTANCE FROM AXIS OF SYMMETRY ........... RADIUS = 0.00000D+00
+
+
+
+
+           INPUT DATA FOR 3D ISOPARAMETRIC ELEMENT
+
+           MAKSIMAL NUMBER OF NODES PER ELEMENT .......... NP3DMX =    8
+                EQ.0; BECOME "8" (FOR 8 NODES)
+                GT.8; FOR ELEMENT OF 9 TO 20 NODES
+
+

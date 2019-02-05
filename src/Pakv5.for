@@ -30,8 +30,13 @@ C==========================================================================
        AK(3,5,I)=AK(1,5,I)
        IF(IPAKT.EQ.1) AK(3,5,I)=AK(2,1,I)
         IF(INDSC.EQ.2.OR.INDSC.EQ.1) go to 20
+       IF(IPAKT.EQ.0) THEN
        WRITE(IIZLAZ,1016)I,AK(1,1,I),I,AK(1,2,I),I,AK(1,3,I),I,AK(1,4,I)
      1 ,I,AK(2,1,I),I,AK(2,2,I),I,AK(2,3,I),I,AK(2,4,I),I,AK(1,5,I)
+       ELSEIF(IPAKT.EQ.1) THEN
+       WRITE(IIZLAZ,1017)I,AK(1,1,I),I,AK(1,2,I),I,AK(1,3,I),I,AK(1,4,I)
+     1 ,I,AK(2,1,I)
+       ENDIF
   20    CONTINUE
       ENDDO
       RETURN
@@ -52,6 +57,12 @@ C    111X,'DENSITY OF THE FLUID FOR MATERIAL ',I3,' ....Rf= ',D10.3///)
      111X,'PERMEABILITY Kzmax FOR MATERIAL ',I3,' ...Kzmax= ',1PD10.3//
      111X,'STORAGEmax FOR MATERIAL ',I3,' ...........Smax = ',1PD10.3//
      111X,'POROSITY FOR MATERIAL ',I3,' ............... n = ',1PD10.3//)
+ 1017 FORMAT(////
+     111X,'koeficijent provodjenja Kx za mat. ',I3,' ... Kx= ',1PD10.3//
+     111X,'koeficijent provodjenja Ky za mat. ',I3,' ... Ky= ',1PD10.3//
+     111X,'koeficijent provodjenja Kz za mat. ',I3,' ... Kz= ',1PD10.3//
+     111X,'gustina materijala ',I3,' ................... ro= ',1PD10.3//
+     111X,'specificna toplota ',I3,' .................. cp= ',1PD10.3//)
       
       END
 C=======================================================================
@@ -345,7 +356,7 @@ C==========================================================================
      5	 NEL(9,NELTOK(1,I)).EQ.NELTOK(8,I)) THEN
 		npov=4
 	  ENDIF
-	  if(npov.eq.0) stop "The surface is not defined on element"
+! 	  if(npov.eq.0) stop "The surface is not defined on element"
       IF(INPT.EQ.1) THEN      
       WRITE(IIZLAZ,1017) NELTOK(1,I),NELTOK(2,I),NELTOK(3,I),
      1 NELTOK(4,I),NELTOK(5,I),NELTOK(6,I),NELTOK(7,I),NELTOK(8,I),
@@ -901,7 +912,7 @@ C
 C==========================================================================
 C
 C======================================================================
-      SUBROUTINE OTVTEMP(KKORAK)
+      SUBROUTINE OTVTEMPDJ(KKORAK)
 CS OTVARANJE DATOTEKE ZA UPISIVANJE TEMPERATURA
 CE OPEN FILE FOR WRITING OF VOLUME FORCES
       COMMON /SRPSKI/ ISRPS
@@ -913,6 +924,7 @@ CE OPEN FILE FOR WRITING OF VOLUME FORCES
       LOGICAL OLDNEW
       CHARACTER*2 IMECSV,ik2
       CHARACTER*1 IMECSV1,ik1
+      CHARACTER*3 ik3
       COMMON /CDEBUG/ IDEBUG
       IF(IDEBUG.GT.0) PRINT *, ' OTVGRA'
 C
@@ -922,7 +934,25 @@ C
 !       IME = ZTEMP
 !       IFILE=105
        IFILE=105
-        IF(KKORAK.GE.10)THEN
+        IF(KKORAK.GE.100.AND.KKORAK.LE.999)THEN
+          write(ik3,32) KKORAK
+c          IME=IME // ik2 // '.T'    
+        IF ((IDJERDAP.GE.10).AND.(IDJERDAP.LE.14)) THEN
+          write(IMECSV,31) IDJERDAP
+        IME='L' // IMECSV // '-ND' // ik3 // '.T'   
+        ELSEIF (IDJERDAP.LT.10)THEN
+          write(IMECSV1,30) IDJERDAP
+        IME='L' // IMECSV1 // '-ND' // ik3 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.15))THEN
+          IME='SIII-ND' // ik3 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.16))THEN
+          IME='SII-ND'  // ik3 // '.T' 
+        ELSEIF ((IDJERDAP.EQ.17))THEN
+          IME='SI-ND' // ik3 // '.T'   
+        ELSEIF ((IDJERDAP.EQ.18))THEN
+          IME='MB-ND' // ik3 // '.T'   
+        ENDIF
+        ELSEIF(KKORAK.GE.10.AND.KKORAK.LE.99)THEN
           write(ik2,31) KKORAK
 c          IME=IME // ik2 // '.T'    
         IF ((IDJERDAP.GE.10).AND.(IDJERDAP.LE.14)) THEN
@@ -996,6 +1026,66 @@ c          IME=IME // ik1 // '.T'
 !        ENDIF
    30  FORMAT (I1)
    31  FORMAT (I2)
+   32  FORMAT (I3)
+C
+      RETURN
+      END
+C==========================================================================
+C
+      SUBROUTINE OTVTEMP(KKORAK)
+CS OTVARANJE DATOTEKE ZA UPISIVANJE TEMPERATURA
+CE OPEN FILE FOR WRITING OF VOLUME FORCES
+!       COMMON /IME/ IME
+      COMMON /SRPSKI/ ISRPS
+      COMMON /IMEULZ/ PAKLST,PAKUNV,ZSILE,PAKNEU,IDUZIN,ZTEMP
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
+      CHARACTER *54 PAKLST,PAKUNV,ZSILE,PAKNEU,ZTEMP
+      CHARACTER*1 IME*50,IMET*80,STAT*3
+      CHARACTER IMEDJ(5)*25
+      LOGICAL OLDNEW
+      CHARACTER*2 IMECSV,ik2
+      CHARACTER*1 IMECSV1,ik1
+      CHARACTER*3 ik3
+      COMMON /CDEBUG/ IDEBUG
+      IF(IDEBUG.GT.0) PRINT *, ' OTVGRA'
+C
+CS IZLAZ ZA ZAPREMINSKE SILE
+CE OUTPUT FOR VOLUME FORCES
+       IB=INDEX(ZTEMP,'.')
+       IFILE=105
+       IF(KKORAK.GE.10.AND.KKORAK.LE.99)THEN
+          write(ik2,31) KKORAK
+c          IME=IME // ik2 // '.T'    
+        IMET=ZTEMP(1:IB-1) // '-ND' // ik2 // '.T'   
+       ELSEIF(KKORAK.LT.10)THEN
+          write(ik1,30) KKORAK
+c          IME=IME // ik1 // '.T'    
+        IMET= ZTEMP(1:IB-1) // '-ND' // ik1 // '.T'   
+       ELSEIF(KKORAK.GE.100.AND.KKORAK.LE.999)THEN
+          write(ik3,32) KKORAK
+c          IME=IME // ik3 // '.T'    
+        IMET= ZTEMP(1:IB-1) // '-ND' // ik3 // '.T'   
+       ENDIF
+!          write(*,*) 'IMET ', IMET
+!           IFILE=IFILE+KKORAK
+   16     CONTINUE
+   21     STAT='NEW'
+          INQUIRE(FILE=IMET,EXIST=OLDNEW)
+          IF(OLDNEW) STAT='OLD'
+          IF(STAT.EQ.'NEW') THEN
+       OPEN (IFILE,FILE=IMET,STATUS='NEW',FORM='FORMATTED',
+     1 ACCESS='SEQUENTIAL')
+                         ELSE
+       OPEN (IFILE,FILE=IMET,STATUS='OLD',FORM='FORMATTED',
+     1 ACCESS='SEQUENTIAL')
+                         ENDIF
+         IND=0
+         IF(STAT.EQ.'OLD') CALL BRISZST (IMET,IFILE,IND)
+         IF(IND.EQ.1)GO TO 21
+         IF(IND.EQ.2)GO TO 16
+   30  FORMAT (I1)
+   31  FORMAT (I2)
+   32  FORMAT (I3)
 C
       RETURN
       END

@@ -491,7 +491,9 @@ C
 !           WRITE(*,*) 'ELEMENT TYPE UNKNOWN NETIP=',eltypes(J)
 !         END SELECT
 C stampanje propertija - stampa za svaki properti materijal, tj. bro properija=NUMMAT*numeltip
-        DO I=1,NUMMAT
+        NUMMATT=NUMMAT
+        IF(IPAKT.EQ.0.AND.ISPRESEK.EQ.-2) NUMMATT=13
+        DO I=1,NUMMATT
          ICOL=I
 c         ICOL=124-(I-1)*2
 c         ICOL=120-(I-1)*3
@@ -1621,6 +1623,139 @@ C         ieltypesp=2300+I
               IMEPR='injekciona zavesa '         
          CASE DEFAULT
          END SELECT
+        ELSEIF (IPAKT.EQ.0.AND.ISPRESEK.EQ.-2)THEN
+!          write(*,*) 'Vlasina properti'
+         SELECT CASE (I)
+          CASE  (1)
+             IMEPR="Glineno jezgro"
+          CASE  (2)
+             IMEPR="Glineni sut 1"
+          CASE  (3)
+             IMEPR='Glineni sut 2'
+          CASE  (4)
+             IMEPR='Kameni sut 1'
+          CASE  (5)
+             IMEPR='Beton'
+          CASE  (6)     
+             IMEPR='Injekciona zavesa'
+          CASE  (7)
+             IMEPR='Stenska masa'
+          CASE  (8) 
+             IMEPR='Malo sispucali skriljci'
+          CASE  (9)   
+             IMEPR='Drenaza'
+          CASE (10)  
+             IMEPR='Drenaza - kameni nabacaj'
+          CASE (11)   
+             IMEPR='Deponija'
+          CASE (12)  
+             IMEPR='Nasip'
+          CASE (13)  
+             IMEPR='Kameni sut 2'
+!           CASE  (1)
+!              IMEPR="K-J-1"
+!           CASE  (2)
+!              IMEPR="K-J-2"
+!           CASE  (3)
+!              IMEPR='K-J-3'
+!           CASE  (4)
+!              IMEPR='K-J-4'
+!           CASE  (5)
+!              IMEPR='K-J-5'
+!           CASE  (6)     
+!              IMEPR='K-J-6'
+!           CASE  (7)
+!              IMEPR='K-J-7'
+!           CASE  (8) 
+!              IMEPR='K-J-8'
+!           CASE  (9)   
+!              IMEPR='K-J-9'
+!           CASE (10)  
+!              IMEPR='K-J-10'
+!           CASE (11)   
+!              IMEPR='K-J-11'
+!           CASE (12)  
+!              IMEPR='K-J-12'
+!           CASE (13)  
+!              IMEPR='K-G1'
+!           CASE (14)  
+!              IMEPR='K-G2'
+!           CASE (15)  
+!              IMEPR='K-K1'
+!           CASE (16)  
+!              IMEPR='K-K2'
+!           CASE (17)  
+!              IMEPR='K-D'
+!           CASE (18)  
+!              IMEPR='K-N'
+!           CASE (19)  
+!              IMEPR='K-B-IG'
+!           CASE (20)  
+!              IMEPR='K-B-OT'
+!           CASE (21)  
+!              IMEPR='K-IZ-P1'
+!           CASE (22)  
+!              IMEPR='K-IZ-P2'
+!           CASE (23)  
+!              IMEPR='K-IZ-P3'
+!           CASE (24)  
+!              IMEPR='K-IZ-P4'
+!           CASE (25)  
+!              IMEPR='K-IZ-P5'
+!           CASE (26)   
+!              IMEPR='K-IZ-P6'
+!           CASE (27)  
+!              IMEPR='K-IZ-P7'
+!           CASE (28)   
+!              IMEPR='K-IZ-P8'
+!           CASE (29)   
+!              IMEPR='K-IZ-P9'
+!           CASE (30)   
+!              IMEPR='K-IZ-P10'
+!           CASE (31) 
+!              IMEPR='K-IZ-P11'
+!           CASE (32) 
+!              IMEPR='K-IZ-P12'
+!           CASE (33)  
+!              IMEPR='K-IZ-D1'
+!           CASE (34)  
+!              IMEPR='K-IZ-D2'
+!           CASE (35)  
+!              IMEPR='K-IZ-D3'
+!           CASE (36)  
+!              IMEPR='K-IZ-D4'
+!           CASE (37)  
+!              IMEPR='K-IZ-D5'
+!           CASE (38)  
+!              IMEPR='K-IZ-D6'
+!           CASE (39)  
+!              IMEPR='K-IZ-D7'
+!           CASE (40)  
+!              IMEPR='K-IZ-D8'
+!           CASE (41)  
+!              IMEPR='K-IZ-D9'
+!           CASE (42)  
+!              IMEPR='K-IZ-D10'
+!           CASE (43) 
+!              IMEPR='K-IZ-D11'
+!           CASE (44)  
+!              IMEPR='K-IZ-D12'
+!           CASE (45)  
+!              IMEPR='K-S-1'
+!           CASE (46)  
+!              IMEPR='K-S-2'
+!           CASE (47)  
+!              IMEPR='K-S-3'
+!           CASE (48) 
+!              IMEPR='K-S-4'
+!           CASE (49) 
+!              IMEPR='K-D-1'
+!           CASE (50) 
+!              IMEPR='K-D-2'
+!           CASE (51)  
+!              IMEPR='K-Z'
+         CASE DEFAULT
+         END SELECT
         ENDIF
          WRITE(II,2005) IMEPR
 !          WRITE(II,2001) I
@@ -2194,7 +2329,8 @@ CS.       ZA STAMPANJE (2/D) ELEMENATA preseka U NEUTRALNI FILE
 C .
 C .......................................................................
 C 
-       COMMON /MATER/ NUMMAT
+      COMMON /MATER/ NUMMAT
+      COMMON /DJERDAP/ IDJERDAP,ISPRESEK
 !       COMMON /DODAT/ NDIMM
 !       DIMENSION NEL(NDIMM,*)
       INTEGER IELNODE
@@ -2275,25 +2411,44 @@ C        TABELA MATERIJALA
 !          IF(NEMA.GT.0) MPTN=NUMMAT+1
 !          elemtip(I)=23
 !          MPTN=1
-         MPTN=NELP(5,I,IPR)
 !  stampanje propertija na osnovu zadnjeg cvora elemenata
-         IF(NELP(5,I,IPR).EQ.1) THEN
-          MPTN=1
-         elseif (NELP(5,I,IPR).EQ.9) THEN
-          MPTN=9
-         else
+!          write(*,*) "ISPRESEK",ISPRESEK
+         MPTN=NELP(5,I,IPR)
+         IF(ISPRESEK.GE.-1) THEN
+          IF(NELP(5,I,IPR).EQ.1) THEN
+           MPTN=1
+          elseif (NELP(5,I,IPR).EQ.9) THEN
+           MPTN=9
+          else
             DO J=2,4
                ncvorpr=NELP(J,I,IPR)
                MPTN=NPROP(ncvorpr,IPR)
                IF(MPTN.NE.1.AND.MPTN.NE.9) GO TO 20
             ENDDO
+          ENDIF
+         ELSEIF(ISPRESEK.EQ.-2) THEN
+            ncvorpr=NELP(2,I,IPR)
+            MPTN1=NPROP(ncvorpr,IPR)
+            ncvorpr=NELP(3,I,IPR)
+            MPTN2=NPROP(ncvorpr,IPR)
+            ncvorpr=NELP(4,I,IPR)
+            MPTN3=NPROP(ncvorpr,IPR)
+            IF(MPTN.NE.7) GO TO 20
+            IF((MPTN1.EQ.MPTN2).OR.(MPTN1.EQ.MPTN3)) MPTN=MPTN1
+            IF(MPTN2.EQ.MPTN3) MPTN=MPTN2
+            IF(MPTN.EQ.48) THEN
+              MPTN=8
+            ELSE
+              MPTN=7
+            ENDIF
          ENDIF
+!          write(*,*) 'MPTN',MPTN,MPTN1,MPTN2
 C        BOJA  
    20    ICOL=124-(MPTN-1)*2
 !          IPROP=1
          elemtipe=23
          IPROP=MPTN
-!        write(3,*)"NELP neu",I,(NELP(ji,I,IPR),ji=1,5)
+!           write(*,*) 'I,MPTN,IPROP',I,MPTN,IPROP
 !          IPROP=elemtipe*100+MPTN
 c         ICOL=124-(MPTN-1)*2
 c         ICOL=120-(MPTN-1)*3
@@ -2550,10 +2705,14 @@ C                       FSP(J)=RTH(J,K)
                   IF(ID(J,I).EQ.0) GO TO 20
                   K = ID(J,I)
                   IF(K.GT.0) THEN
-C                    DUBINA VODE ILI PRITISAK VODENOG STUBA
-                     FSP(J)=(RTH(1,K)-CORD(IOSA,I))
-                     IF(FSP(J).GT.0.) FSP(J)=0.     
-                  ENDIF
+C    provera da li je cvor okvasen
+                IF((IPAKT.EQ.0).AND.((POT(K)-0.0001)
+     1             .LT.CORD(IOSA,I))) goto 10
+                 FSP(J)=PPC
+C                 DUBINA VODE ILI PRITISAK VODENOG STUBA
+                  FSP(J)=(RTH(1,K)-CORD(IOSA,I))
+!                      IF(FSP(J).GT.0.) FSP(J)=0.     
+                ENDIF
                ELSEIF(IN(1).EQ.9) THEN
                  FSP(J)=1.0D0
                  DO L=1,NUMZAD 
@@ -3391,6 +3550,7 @@ C=======================================================================
 C
       COMMON /DODAT/ NDIMM
       COMMON /ULAZNI/ IULAZ,IIZLAZ,IPAKT
+      COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
 C      COMMON /ELECTR/ INDJOT,INDFS
 C      COMMON /OSATEZ/ ZASIC,IOSA,ISIL,IFIL,IPOR
 !       COMMON /VOPTIM/ NKONT,MAXLIN,LIN(10)
@@ -3421,6 +3581,7 @@ C Termometri ekstrapolacija
 !          WRITE(51,*) "Pijez., Potencijal"
          WRITE(II,5000) MJ
          WRITE(II,1010) VREME
+!          WRITE(II,*) "ISNUMBER",ISNUMBER
          DO 14 I=1,MAX_MPOINTS
 C ODREDJIVANJE POTENCIJALA na mestu termometra
 C za heksa elemente
@@ -3467,30 +3628,32 @@ C TETRA ELEMENTI SA 10 CVOROVA
               YPC=0.
               ZPC=0.
             DO JJH=1,10
-              ncvor=NEL(JJH,MP_ELEMENT(I))          
+              ncvor=NEL(JJH,MP_ELEMENT(I)) 
+              
               PPC=PPC + H(JJH)*RTH(1,ncvor)
               XPC=XPC+H(JJH)*CORD(1,ncvor)
               YPC=YPC+H(JJH)*CORD(2,ncvor)
               ZPC=ZPC+H(JJH)*CORD(3,ncvor)
-              IF(ISNUMBER.EQ.0) THEN
+             IF(ISNUMBER.EQ.0) THEN
               WRITE(II,5001) I,ncvor,MP_ELEMENT(I),H(JJH),RTH(1,ncvor)
-!               write(*,*) 'I,ncvor,ELEMENT',I,ncvor,MP_ELEMENT(I)
-              ELSEIF(ISNUMBER.EQ.1) THEN
+!               write(II,*) 'I,ncvor,ELEMENT',I,ncvor,MP_ELEMENT(I)
+             ELSEIF(ISNUMBER.EQ.1) THEN
               ncvor1=NCVEL(ncvor)
               eleme1=MCVEL(MP_ELEMENT(I))
               WRITE(II,5001) I,ncvor1,MCVEL(MP_ELEMENT(I)),
      1                       H(JJH),RTH(1,ncvor)
-!             write(*,*) 'I,ncvor1,EL',I,ncvor1,MP_ELEMENT(I),eleme1
-              ENDIF
+!               write(II,*) 'I,ncvor,ELEM',I,ncvor,MCVEL(MP_ELEMENT(I))
+!              write(*,*) 'I,ncvor1,EL',I,ncvor1,MP_ELEMENT(I),eleme1
+             ENDIF
            enddo
 C  NEMA ZA TEMPERATURE OVOG USLOVA       if(ppc.lt.zpc) ppc=0.D0                
 C
-         IF((IPAKT.EQ.0).AND.((PPC-0.0001).LT.MP_COORDS(3,I)))THEN
-                 PPC=0.0
+           IF((IPAKT.EQ.0).AND.((PPC-0.0001).LT.MP_COORDS(IOSA,I)))THEN
+                PPC=0.0
 !             WRITE(51,5011) MPOINT_ID(I),PPC
-            ENDIF
-            MP_RESULTS(KORAK,I+1)=PPC
-            WRITE(II,5010) MPOINT_ID(I),PPC,XPC,YPC,ZPC
+           ENDIF
+           MP_RESULTS(KORAK,I+1)=PPC
+           WRITE(II,5010) MPOINT_ID(I),PPC,XPC,YPC,ZPC
            IF (IPAKT.EQ.0)  WRITE(51,5011) MPOINT_ID(I),PPC
    14    CONTINUE
          WRITE(II,5000) MJ
@@ -4706,7 +4869,7 @@ C                 DO LI=2,NNODE+1
                   IF(K.GT.0) THEN
 !                      IF(POT(K).GT.CORD(IOSA,I)) FSP(J)=RTH(J,I)
 c                  ELSE
-c                     FSP(J)=RTH(J,I)
+!                      FSP(J)=RTH(J,I)
                   ENDIF
                ELSE   
                   FSP(J)=RTH(J,I)
@@ -5128,7 +5291,8 @@ C TETRA ELEMENTI SA 10 CVOROVA
 !            enddo
 C
 !             MP_RESULTS(KORAK,I+1)=PPC
-       WRITE(II,5010) NP_ID(I,IPR),PORNIEL(NP_ELEMENT(I,IPR),ngnaj)
+        IF(PORNIEL(NP_ELEMENT(I,IPR),ngnaj).GT.0.D0)
+     1   WRITE(II,5010) NP_ID(I,IPR),PORNIEL(NP_ELEMENT(I,IPR),ngnaj)
    14    CONTINUE
          WRITE(II,5000) MJ,ZERO
 !          MP_VREME(KORAK)=VREME
